@@ -1,0 +1,19 @@
+# Dependencies (installers pull these themselves)
+/vendor/
+composer.lock
+
+# Local env / IDE / OS
+.env
+.env.*
+.idea/
+.vscode/
+.DS_Store
+
+# Test / tooling caches
+.phpunit.result.cache
+.phpunit.cache/
+/build/
+coverage/
+
+# PRAL's official spec — kept local, not redistributed (copyright)
+FBR Documentation.pdf
