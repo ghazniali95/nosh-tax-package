@@ -62,13 +62,74 @@ You never touch a government API directly, and you never rewrite your billing co
 | Authority | Region | Applies to | Status |
 |---|---|---|---|
 | **FBR** (Federal, via PRAL) | Islamabad / ICT + goods | Services (ICT), goods | ✅ Available |
-| **PRA** — Punjab Revenue Authority | Punjab | Restaurant / services | 🚧 Rolling out |
-| **SRB** — Sindh Revenue Board | Sindh | Restaurant / services | 🚧 Rolling out |
+| **SRB** — Sindh Revenue Board | Sindh | Restaurant / services | ✅ Available (cloud + offline) |
+| **PRA** — Punjab Revenue Authority | Punjab | Restaurant / services | ✅ Available (cloud + offline) |
 | **KPRA** — KP Revenue Authority | Khyber Pakhtunkhwa | Restaurant / services | 🚧 Rolling out |
 | **BRA** — Balochistan Revenue Authority | Balochistan | Restaurant / services | 🗓️ Planned |
 | **International** (ZATCA, MyInvois, …) | Global | Any | 🧭 By design — see §20 |
 
 > The public API in this document is **identical for every authority**. Enabling a new one is a configuration change, not a rewrite of your billing code.
+
+### 2a. SRB (Sindh Revenue Board) — cloud & offline
+
+SRB reports each sale to the SRB POS system and prints an **SRB Invoice Number** plus a QR code that encodes the SRB **verification URL**. SRB offers two integration modes, and this package supports **both from the same code** — you build the same canonical invoice and only the deployment's mode differs:
+
+| Mode | For | How it connects | Credentials |
+|---|---|---|---|
+| **`cloud`** | Your **online / website** deployment | Calls the SRB gateway directly: `POST https://pos.srb.gos.pk/ePOSGateway/v1/SalesInvoiceService.api` | Sends `posUser` / `posPass` (issued by SRB) in the request body |
+| **`offline`** | Your **desktop app** | Calls the **SRB POS Connector** running on the same machine: `POST http://localhost:8282/pos/SalesInvoiceServices` | None in the request — the Connector holds them |
+
+Pick the mode per deployment (`FISCAL_SRB_MODE=cloud|offline`, or the `mode` column per tenant). Everything else is shared.
+
+```php
+use Nosh\OmniTax\Facades\OmniTax;
+
+$response = OmniTax::authority('srb')->submit($invoice);   // uses the configured mode
+
+if ($response->isValid()) {
+    $srbNumber = $response->invoiceNumber();   // e.g. "33126066A22" — print on the receipt
+    $qr        = $response->qr();               // encodes the SRB verification URL (not the number)
+}
+```
+
+**SRB specifics** the driver handles for you (per SRB's official POS API guides):
+
+- SRB works at the **invoice-total level**: one tax rate, gross sale value, and computed tax / net amounts. The driver aggregates your line items and applies SRB's exact formulae — `taxAmount = (saleValue + serviceCharges + extraCharges) × rate/100` and `netAmount = saleValue + serviceCharges + extraCharges + taxAmount − discountAmount`. (SRB is **one rate per invoice** — a mixed-rate invoice is rejected with a clear error.)
+- **Invoice-level extras** map from builder helpers: `->number('PZ010')` (unique `invoiceId`), `->at('2025-12-26 23:58:58')`, `->serviceCharges()`, `->extraCharges()`, `->discountAmount()`, `->modeOfPay('Cash')`.
+- **NTN** is normalised to SRB's rule automatically (no leading `S`, no digit after the hyphen). The QR encodes the returned verification URL. Sandbox sends `transType: "Test"`, production `"Live"`.
+- **Credentials:** set `FISCAL_SRB_POS_ID`, and for cloud mode `FISCAL_SRB_POS_USER` / `FISCAL_SRB_POS_PASS` (single-business); or the per-tenant `pos_id` / `pos_user` / `pos_pass` / `mode` columns on `fiscal_credentials` (the pos credentials are encrypted at rest). Register the POS and obtain these from the **SRB POS portal** (`https://pos.srb.gos.pk/PoSRegistration/`).
+
+As with FBR, set `FISCAL_TRANSPORT=mock` to build and test the whole SRB flow — both modes — with **no POS ID and no network**.
+
+### 2b. PRA (Punjab Revenue Authority) — cloud & offline
+
+PRA (via PRAL) fiscalises each sale through its **Software Fiscal Device / IMS** and returns a **PRA Invoice Number** plus a QR that encodes PRA's verification URL. Like SRB, PRA offers two integration modes, and the package supports **both from the same code** — same canonical invoice, only the deployment's mode differs:
+
+| Mode | For | How it connects | Auth |
+|---|---|---|---|
+| **`cloud`** | Your **online / website** deployment | Posts straight to PRAL: `POST https://ims.pral.com.pk/ims/{sandbox\|production}/api/Live/PostData` | `Authorization: Bearer <token>` (+ TLS 1.2, and the server's IP must be **whitelisted** by PRA) |
+| **`offline`** | Your **desktop app** | Posts to PRA's locally-installed **Software Fiscal Device** (IMS component): `POST http://localhost:8524/api/IMSFiscal/GetInvoiceNumberByModel` — the component then syncs to PRA on its own | None — the installed component holds the POS credentials |
+
+Pick the mode per deployment (`FISCAL_PRA_MODE=cloud|offline`, or the `mode` column per tenant).
+
+```php
+$response = OmniTax::authority('pra')->submit($invoice);
+
+if ($response->isValid()) {
+    $praNumber = $response->invoiceNumber();   // e.g. "9000052011142444901"
+    $qr        = $response->qr();               // encodes PRA's verification URL
+}
+```
+
+**PRA specifics** the driver handles (per PRAL's "Software Fiscal Device" spec v1.2):
+
+- PRA is **per-item** (like FBR): each line carries `SaleValue`, `TaxRate`, `PCTCode` (HS/classification, default `00000000`), `TaxCharged`, `TotalAmount`. The driver rolls the header totals (`TotalSaleValue`, `TotalTaxCharged`, `TotalBillAmount`) from the lines — PRA's arithmetic is `TotalBillAmount = TotalSaleValue + TotalTaxCharged + FurtherTax`, with discount **recorded separately**, not subtracted.
+- **`InvoiceType`** maps `Sale Invoice → 1 (New)`, `Debit Note → 2`, `Credit Note`/return → `3`; **`PaymentMode`** maps `Cash→1, Card→2, Gift→3, Loyalty→4, Mixed→5, Cheque→6` (via `->modeOfPay()`). Your own invoice number is `USIN` (`->number()`), and a return references the original via `meta(['refUsin' => …])`.
+- Success is **`Code === "100"`** (note: FBR/SRB use `"00"`). The QR encodes PRA's verification URL: `…/SearchPOSInvoice_Report.aspx?PRAInvNo=<number>`.
+- **Credentials:** cloud sets `FISCAL_PRA_TOKEN` (sandbox token is public in PRA's spec; production token comes from the POS Registration screen) and `FISCAL_PRA_POS_ID`; offline needs neither (the installed component has them). Register the POS at `reg.pra.punjab.gov.pk` / `e.pra.punjab.gov.pk`.
+- **Note on offline:** PRA's offline component is a Windows/.NET service the merchant installs; the package **talks to** it on `localhost:8524` (it doesn't ship or install it) — the same division of labour as SRB's Connector.
+
+As always, `FISCAL_TRANSPORT=mock` runs the whole PRA flow — both modes — with **no token, no IP whitelisting and no network**.
 
 ---
 

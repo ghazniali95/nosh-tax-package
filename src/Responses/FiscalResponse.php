@@ -21,6 +21,7 @@ class FiscalResponse
         protected array $itemStatuses = [],
         protected array $raw = [],
         protected int $httpStatus = 200,
+        protected ?string $qrPayload = null,
     ) {
     }
 
@@ -71,10 +72,23 @@ class FiscalResponse
         return $this->httpStatus;
     }
 
-    /** The QR code to print (encodes the fiscal invoice number). Null if rejected. */
+    /** The exact string a driver wants encoded in the QR, when it differs from the
+     *  fiscal number (SRB encodes the verification URL; FBR encodes the number). */
+    public function qrPayload(): ?string
+    {
+        return $this->qrPayload ?? $this->invoiceNumber;
+    }
+
+    /**
+     * The QR code to print. Encodes the driver-supplied QR payload when present
+     * (SRB → verification URL), otherwise the fiscal invoice number (FBR).
+     * Null if the invoice was rejected.
+     */
     public function qr(): ?QrCode
     {
-        return $this->invoiceNumber ? new QrCode($this->invoiceNumber) : null;
+        $payload = $this->qrPayload();
+
+        return $payload ? new QrCode($payload) : null;
     }
 
     public function toArray(): array
@@ -82,6 +96,7 @@ class FiscalResponse
         return [
             'valid'         => $this->valid,
             'invoiceNumber' => $this->invoiceNumber,
+            'qrPayload'     => $this->qrPayload(),
             'dated'         => $this->dated,
             'statusCode'    => $this->statusCode,
             'status'        => $this->status,

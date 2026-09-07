@@ -104,6 +104,49 @@ class InvoiceBuilder
         return $this;
     }
 
+    // ---- Invoice-level fields used by SRB (stored in meta; other drivers -----
+    // ---- read line items, so these are harmless no-ops for them). -----------
+
+    /** Our own unique invoice number (SRB `invoiceId`; must be unique per sale). */
+    public function number(string $invoiceId): self
+    {
+        return $this->meta(['invoiceId' => $invoiceId]);
+    }
+
+    /** Full invoice timestamp (SRB requires `yyyy-MM-dd HH:mm:ss`). */
+    public function at(DateTimeInterface|string $dateTime): self
+    {
+        $value = $dateTime instanceof DateTimeInterface
+            ? $dateTime->format('Y-m-d H:i:s')
+            : $dateTime;
+
+        return $this->meta(['invoiceDateTime' => $value]);
+    }
+
+    /** Invoice-level service charges (SRB `serviceCharges`). */
+    public function serviceCharges(float $amount): self
+    {
+        return $this->meta(['serviceCharges' => $amount]);
+    }
+
+    /** Invoice-level extra charges (SRB `extraCharges`). */
+    public function extraCharges(float $amount): self
+    {
+        return $this->meta(['extraCharges' => $amount]);
+    }
+
+    /** Invoice-level discount (SRB `discountAmount`). */
+    public function discountAmount(float $amount): self
+    {
+        return $this->meta(['discountAmount' => $amount]);
+    }
+
+    /** Payment mode printed on the receipt (SRB `modeOfPay`: Cash/Card). */
+    public function modeOfPay(string $mode): self
+    {
+        return $this->meta(['modeOfPay' => $mode]);
+    }
+
     public function addItem(LineItem|LineItemBuilder $item): self
     {
         $this->invoice->items[] = $item instanceof LineItemBuilder ? $item->build() : $item;

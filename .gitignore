@@ -15,5 +15,6 @@ composer.lock
 /build/
 coverage/
 
-# PRAL's official spec — kept local, not redistributed (copyright)
-FBR Documentation.pdf
+# Authorities' official specs & manuals — kept local, never redistributed
+# (confidential / copyright: FBR, SRB, PRA POS integration docs)
+*.pdf

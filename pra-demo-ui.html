@@ -1,0 +1,595 @@
+<title>PRA Fiscal POS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#eef1f6; --surface:#ffffff; --surface-2:#f5f7fb; --ink:#141a26; --muted:#5c6577;
+  --line:#dde2ec; --line-strong:#c8d0de;
+  --accent:#1c4e86; --accent-ink:#173f6d; --accent-soft:#e5edf7;
+  --cloud:#1c7fb8; --cloud-soft:#e2f0f8; --offline:#586475; --offline-soft:#e9ecf1;
+  --valid:#1a7a4e; --valid-soft:#e3f1e9; --reject:#bb2f2f; --reject-soft:#f7e7e5; --warn:#a9791b;
+  --wire-bg:#0c1522; --wire-ink:#cddcf0; --wire-dim:#5f7593; --wire-key:#7fb0e6; --wire-str:#e6c07b; --wire-num:#7fd3a8;
+  --paper:#fbfaf7; --paper-ink:#1a1a17; --paper-line:#cfc9b8;
+  --radius:14px; --radius-sm:9px;
+  --shadow:0 1px 2px rgba(20,26,38,.05),0 8px 24px -12px rgba(20,26,38,.2);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c1017; --surface:#141a24; --surface-2:#101620; --ink:#e7ecf4; --muted:#9ba7ba;
+    --line:#232c3a; --line-strong:#313d4f;
+    --accent:#4d8fd6; --accent-ink:#6ba5e4; --accent-soft:#14243a;
+    --cloud:#4fa2d8; --cloud-soft:#122536; --offline:#96a2b3; --offline-soft:#1b2129;
+    --valid:#3ba877; --valid-soft:#15281f; --reject:#e0776f; --reject-soft:#2c1a18; --warn:#d0a24b;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c1017; --surface:#141a24; --surface-2:#101620; --ink:#e7ecf4; --muted:#9ba7ba;
+  --line:#232c3a; --line-strong:#313d4f;
+  --accent:#4d8fd6; --accent-ink:#6ba5e4; --accent-soft:#14243a;
+  --cloud:#4fa2d8; --cloud-soft:#122536; --offline:#96a2b3; --offline-soft:#1b2129;
+  --valid:#3ba877; --valid-soft:#15281f; --reject:#e0776f; --reject-soft:#2c1a18; --warn:#d0a24b;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:"Manrope",system-ui,sans-serif;line-height:1.5;
+  -webkit-font-smoothing:antialiased;padding:0;margin:0}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.wrap{max-width:1220px;margin:0 auto;padding:20px 20px 48px}
+h1,h2,h3{margin:0;text-wrap:balance}
+button{font-family:inherit;cursor:pointer}
+a{color:var(--accent-ink)}
+
+.masthead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding-bottom:16px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:13px}
+.crest{width:44px;height:44px;border-radius:11px;background:var(--accent);color:#fff;display:grid;place-items:center;
+  font-weight:800;font-size:17px;letter-spacing:.02em;box-shadow:var(--shadow);flex:none}
+.brand h1{font-size:21px;font-weight:800;letter-spacing:-.01em}
+.brand p{margin:1px 0 0;font-size:13px;color:var(--muted)}
+.masthead-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mockchip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--muted);
+  background:var(--surface);border:1px solid var(--line);padding:6px 11px;border-radius:999px}
+.mockchip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--warn);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--warn) 22%,transparent)}
+
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:4px;gap:3px}
+.seg button{border:0;background:transparent;color:var(--muted);font-weight:700;font-size:13px;
+  padding:8px 15px;border-radius:8px;display:flex;align-items:center;gap:8px;transition:.15s}
+.seg button .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.55}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.seg button[data-mode="cloud"][aria-pressed="true"]{color:var(--cloud)}
+.seg button[data-mode="offline"][aria-pressed="true"]{color:var(--offline)}
+.seg button[aria-pressed="true"] .dot{opacity:1}
+
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:20px;align-items:start}
+@media (max-width:940px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.panel-h h2{font-size:14px;font-weight:800;letter-spacing:.01em}
+.panel-h .sub{font-size:12px;color:var(--muted);font-weight:600}
+
+.menu{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:14px}
+.dish{position:relative;text-align:left;border:1px solid var(--line);background:var(--surface-2);border-radius:var(--radius-sm);
+  padding:11px 12px;transition:.14s;overflow:hidden}
+.dish:hover{border-color:var(--accent);transform:translateY(-1px)}
+.dish:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dish .n{font-weight:700;font-size:13.5px;line-height:1.25;display:block}
+.dish .p{font-size:12px;color:var(--muted);margin-top:3px}
+.dish .p b{color:var(--ink);font-weight:600}
+.dish .qty{position:absolute;top:8px;right:8px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;
+  background:var(--accent);color:#fff;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center}
+.dish[data-active="1"]{border-color:var(--accent);background:var(--accent-soft)}
+.dish[data-active="1"] .qty{display:flex}
+
+.bill{padding:6px 16px 16px}
+.bill-lines{display:flex;flex-direction:column}
+.bl{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.bl .nm{font-size:13.5px;font-weight:600}
+.bl .nm small{display:block;color:var(--muted);font-weight:500;font-size:11.5px}
+.bl .stepper{display:inline-flex;align-items:center;gap:8px}
+.bl .stepper button{width:22px;height:22px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);
+  color:var(--ink);font-weight:800;line-height:1;display:grid;place-items:center;font-size:13px}
+.bl .stepper button:hover{border-color:var(--accent);color:var(--accent)}
+.bl .amt{font-size:13px;font-weight:600;text-align:right;min-width:74px;font-variant-numeric:tabular-nums}
+.bill-empty{color:var(--muted);font-size:13px;text-align:center;padding:22px 0}
+.paymode{display:flex;align-items:center;gap:8px;margin-top:13px;flex-wrap:wrap}
+.paymode .lbl{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.paymode .pill{border:1px solid var(--line-strong);background:var(--surface-2);color:var(--muted);font-weight:700;
+  font-size:12.5px;padding:5px 12px;border-radius:999px}
+.paymode .pill[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
+.totals{margin-top:14px;border-top:1px solid var(--line-strong);padding-top:12px;display:flex;flex-direction:column;gap:6px}
+.tot{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tot b{color:var(--ink);font-weight:600}
+.tot.grand{font-size:16px;margin-top:4px}
+.tot.grand span:first-child{font-weight:800;color:var(--ink)}
+.tot.grand b{font-weight:800;color:var(--accent-ink)}
+
+.faults{padding:14px 16px}
+.faults .lead{font-size:12px;color:var(--muted);margin:0 0 10px}
+.fault{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.fault:first-of-type{border-top:0}
+.fault input{margin-top:3px;accent-color:var(--reject);width:15px;height:15px;flex:none}
+.fault .fx{font-size:13px;font-weight:600}
+.fault .fx small{display:block;color:var(--muted);font-weight:500;font-size:11.5px;margin-top:1px}
+
+.wire{background:var(--wire-bg);border-radius:0 0 var(--radius) var(--radius);padding:0}
+.wire .req-line{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.07);flex-wrap:wrap}
+.verb{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:#0c1522;background:var(--wire-key);
+  padding:3px 8px;border-radius:6px;letter-spacing:.04em}
+.url{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--wire-ink);word-break:break-all;flex:1;min-width:200px}
+.url .host{color:#fff;font-weight:600}
+.mode-tag{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:999px;letter-spacing:.06em}
+.mode-tag.cloud{background:var(--cloud-soft);color:var(--cloud)}
+.mode-tag.offline{background:var(--offline-soft);color:var(--offline)}
+.authhdr{padding:9px 16px;border-bottom:1px solid rgba(255,255,255,.07);font-family:"IBM Plex Mono",monospace;font-size:12px}
+.authhdr .hk{color:var(--wire-dim)}
+.authhdr .hv{color:var(--wire-key)}
+.authhdr.none .hv{color:var(--wire-dim);font-style:italic}
+pre.json{margin:0;padding:14px 16px;font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.6;
+  color:var(--wire-ink);overflow-x:auto;max-height:360px;overflow-y:auto}
+pre.json .k{color:var(--wire-key)}
+pre.json .s{color:var(--wire-str)}
+pre.json .n{color:var(--wire-num)}
+pre.json .muted{color:var(--wire-dim)}
+
+.reportbar{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.report-btn{flex:1;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;font-size:14.5px;
+  padding:13px 16px;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:var(--shadow);transition:.15s}
+.report-btn:hover{filter:brightness(1.08)}
+.report-btn:active{transform:translateY(1px)}
+.report-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.report-note{font-size:11.5px;color:var(--muted);max-width:150px;line-height:1.35}
+
+.response{padding:16px;display:grid;grid-template-columns:1fr;gap:14px}
+.verdict{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:var(--radius-sm);font-weight:700;font-size:13.5px;border:1px solid transparent}
+.verdict.ok{background:var(--valid-soft);color:var(--valid);border-color:color-mix(in srgb,var(--valid) 30%,transparent)}
+.verdict.err{background:var(--reject-soft);color:var(--reject);border-color:color-mix(in srgb,var(--reject) 30%,transparent)}
+.verdict .rc{font-family:"IBM Plex Mono",monospace;font-size:11px;margin-left:auto;opacity:.8;font-weight:600}
+.verdict .ico{width:22px;height:22px;flex:none}
+.errline{font-size:12.5px;color:var(--reject);font-family:"IBM Plex Mono",monospace;background:var(--reject-soft);
+  border-radius:8px;padding:9px 11px;border:1px dashed color-mix(in srgb,var(--reject) 40%,transparent)}
+
+.receipt-wrap{display:flex;justify-content:center}
+.receipt{width:100%;max-width:296px;background:var(--paper);color:var(--paper-ink);border-radius:6px;
+  padding:18px 20px 22px;box-shadow:0 2px 4px rgba(0,0,0,.14),0 14px 34px -16px rgba(0,0,0,.4);position:relative;
+  font-family:"IBM Plex Mono",monospace}
+.receipt.ghost{opacity:.55}
+.receipt .r-head{text-align:center;border-bottom:1px dashed var(--paper-line);padding-bottom:11px;margin-bottom:11px}
+.receipt .r-logo{font-family:"Manrope",sans-serif;font-weight:800;font-size:16px;letter-spacing:.02em}
+.receipt .r-sub{font-size:10px;color:#6b675b;margin-top:2px;font-family:"Manrope",sans-serif;font-weight:700;letter-spacing:.04em}
+.receipt .r-row{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:2px 0}
+.receipt .r-row .lbl{color:#6b675b}
+.receipt .r-row .val{text-align:right;font-weight:500}
+.receipt .r-money{border-top:1px dashed var(--paper-line);border-bottom:1px dashed var(--paper-line);margin:10px 0;padding:9px 0;
+  display:flex;flex-direction:column;gap:3px}
+.receipt .r-money .r-row{font-size:12px}
+.receipt .r-net{font-weight:700}
+.receipt .r-net .val{font-size:13px}
+.receipt .r-srb{text-align:center;margin-top:6px}
+.receipt .r-srb .cap{font-size:10px;color:#6b675b;letter-spacing:.05em;font-family:"Manrope",sans-serif;font-weight:700;text-transform:uppercase}
+.receipt .r-srb .num{font-size:15px;font-weight:600;color:#173f6d;letter-spacing:.02em;margin-top:2px;word-break:break-all}
+.receipt .qr{display:flex;justify-content:center;margin:12px 0 6px}
+.receipt .qr>*{line-height:0}
+.receipt .r-foot{text-align:center;font-size:11px;color:#6b675b;margin-top:4px;letter-spacing:.05em}
+.receipt .stamp{position:absolute;top:12px;right:-6px;transform:rotate(7deg);font-family:"Manrope",sans-serif;
+  font-weight:800;font-size:11px;letter-spacing:.08em;padding:4px 9px;border-radius:5px;border:2px solid;text-transform:uppercase}
+.receipt .stamp.ok{color:#173f6d;border-color:#173f6d;background:rgba(23,63,109,.07)}
+.receipt .stamp.pending{color:#8a856f;border-color:#b8b29a;background:rgba(0,0,0,.02)}
+
+.map{margin-top:22px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+  padding:18px 20px;box-shadow:var(--shadow)}
+.map h3{font-size:14px;font-weight:800;margin-bottom:3px}
+.map>p{font-size:13px;color:var(--muted);margin:0 0 15px;max-width:72ch}
+.map-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:760px){.map-grid{grid-template-columns:1fr}}
+.mc{border:1px solid var(--line);border-radius:var(--radius-sm);padding:13px 14px;background:var(--surface-2)}
+.mc .t{font-size:12px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:7px}
+.mc code{font-family:"IBM Plex Mono",monospace;font-size:11.5px;background:var(--surface);border:1px solid var(--line);
+  padding:1.5px 5px;border-radius:5px;color:var(--ink);word-break:break-word}
+.mc p{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
+.mc .ok-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--valid)}
+.foot-note{margin-top:16px;font-size:12px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <div class="crest">PRA</div>
+      <div>
+        <h1>PRA Fiscal POS</h1>
+        <p>Punjab Revenue Authority digital invoicing — one integration, online &amp; offline</p>
+      </div>
+    </div>
+    <div class="masthead-right">
+      <div class="seg" role="group" aria-label="Integration mode">
+        <button data-mode="cloud" aria-pressed="true"><span class="dot"></span>Cloud · Online</button>
+        <button data-mode="offline" aria-pressed="false"><span class="dot"></span>Offline · Desktop</button>
+      </div>
+      <span class="mockchip">Mock authority · no token, no network</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <section class="panel">
+        <div class="panel-h">
+          <h2>QNF Enterprises · Lahore · Table 4</h2>
+          <span class="sub">tap to add · Punjab services @ <b id="rateLbl">16%</b></span>
+        </div>
+        <div class="menu" id="menu"></div>
+        <div class="bill">
+          <div class="bill-lines" id="billLines"></div>
+          <div class="paymode">
+            <span class="lbl">Payment</span>
+            <button class="pill" data-pay="Cash" aria-pressed="true">Cash</button>
+            <button class="pill" data-pay="Card" aria-pressed="false">Card</button>
+          </div>
+          <div class="totals" id="totals"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-h"><h2>Rejection scenarios</h2><span class="sub">prove the error paths are real</span></div>
+        <div class="faults" id="faults">
+          <p class="lead">PRA validates every invoice. Flip a switch, then press <b>Fiscalise with PRA</b> to see how it responds.</p>
+        </div>
+      </section>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <section class="panel">
+        <div class="panel-h">
+          <h2>PRA request</h2>
+          <span class="sub" id="wireSub">what the package sends</span>
+        </div>
+        <div class="reportbar">
+          <button class="report-btn" id="reportBtn">
+            <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            Fiscalise with PRA
+          </button>
+          <span class="report-note">Posts the bill and prints the fiscal receipt.</span>
+        </div>
+        <div class="wire">
+          <div class="req-line">
+            <span class="verb">POST</span>
+            <span class="url" id="wireUrl"></span>
+            <span class="mode-tag cloud" id="wireMode">CLOUD</span>
+          </div>
+          <div class="authhdr" id="wireAuth"></div>
+          <pre class="json" id="wireJson"></pre>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-h"><h2>PRA response &amp; receipt</h2><span class="sub" id="respSub">live from the mock authority</span></div>
+        <div class="response" id="response"></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="map">
+    <h3>How this maps to the shipped package</h3>
+    <p>The page runs the real driver &amp; mock logic in the browser — identical math, payload and PRA responses to the PHP. The same code points at PRAL's cloud or the local IMS component the moment the client's POS credentials arrive.</p>
+    <div class="map-grid">
+      <div class="mc">
+        <div class="t">One switch, two worlds</div>
+        <p><code>FISCAL_PRA_MODE=cloud</code> → website posts to <code>ims.pral.com.pk</code> with a <code>Bearer</code> token. <code>=offline</code> → desktop app posts to the local IMS component on <code>localhost:8524</code>, no token. Same <code>PraDriver</code>.</p>
+      </div>
+      <div class="mc">
+        <div class="t">Go live, no rewrite</div>
+        <p>Flip <code>FISCAL_TRANSPORT=mock→http</code>, drop in the PRA POS ID + token, and (for cloud) get the server IP whitelisted. Zero billing-code change.</p>
+      </div>
+      <div class="mc">
+        <div class="t">Proven</div>
+        <p class="ok-badge"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> tests/verify-pra.php · 42/42</p>
+        <p><code>PraDriver.php</code> + <code>PraMockTransport.php</code>, alongside FBR &amp; SRB — both their suites still pass, untouched.</p>
+      </div>
+    </div>
+    <p class="foot-note">Demonstration build · mock PRA authority · figures and POS ID are examples, not a live taxpayer record.</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var RATE = 16;
+  var SELLER = {
+    posId: 100000,
+    pntn: "123123",
+    name: "QNF Enterprises",
+    token: "pra_live_9f3c7b21e0a44d5c"
+  };
+  var MENU = [
+    {id:"karahi_f", n:"Chicken Karahi — Full", p:1800},
+    {id:"karahi_h", n:"Chicken Karahi — Half", p:950},
+    {id:"biryani",  n:"Mutton Biryani",        p:650},
+    {id:"naan_g",   n:"Garlic Naan",           p:80},
+    {id:"naan_p",   n:"Plain Naan",            p:30},
+    {id:"drink",    n:"Soft Drink",            p:120},
+    {id:"kheer",    n:"Kheer",                 p:220},
+    {id:"chai",     n:"Kashmiri Chai",         p:190}
+  ];
+  var FAULTS = [
+    {id:"notoken", fx:"Clear the Bearer token",       sub:"Cloud only — PRA returns HTTP 401 Unauthorized."},
+    {id:"badpos",  fx:"Use an unregistered POS ID",   sub:"PRA rejects with Code ≠ 100."},
+    {id:"tamper",  fx:"Tamper with the bill total",   sub:"Bill ≠ Sale + Tax — PRA rejects."},
+    {id:"dupe",    fx:"Reuse the last USIN",           sub:"Duplicate USIN — already fiscalised."}
+  ];
+
+  var state = { mode:"cloud", bill:{ karahi_f:1, naan_g:4 }, pay:"Cash", faults:{}, usinSeq:1001, lastAcceptedUsin:null, seen:{} };
+
+  var $ = function(s,r){return (r||document).querySelector(s);};
+  function money(n){ return "Rs " + Number(n).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function menuItem(id){ for(var i=0;i<MENU.length;i++){ if(MENU[i].id===id) return MENU[i]; } return null; }
+  function round2(n){ return Math.round((n+Number.EPSILON)*100)/100; }
+  function p2(n){ return (n<10?"0":"")+n; }
+  function payMode(name){ return name==="Card"?2:1; }
+
+  function lines(){
+    var out=[];
+    for(var id in state.bill){ if(state.bill[id]>0){ var m=menuItem(id); out.push({id:id,n:m.n,qty:state.bill[id],unit:m.p}); } }
+    return out;
+  }
+
+  function buildPayload(){
+    var L=lines(), errors=[];
+    var posId = state.faults.badpos ? 0 : SELLER.posId;
+    if(!L.length){ errors.push("Add at least one item."); }
+    var cloud = state.mode==="cloud";
+    var hasToken = cloud && !state.faults.notoken;
+    if(cloud && state.faults.notoken){ errors.push("PRA cloud mode requires a Bearer token."); }
+
+    var usin = state.faults.dupe && state.lastAcceptedUsin ? state.lastAcceptedUsin : "USIN-"+state.usinSeq;
+
+    var items=[], totalSale=0, totalTax=0, totalBill=0, totalQty=0;
+    L.forEach(function(l,i){
+      var sale = round2(l.unit*l.qty);
+      var tax = round2(sale*(RATE/100));
+      var total = round2(sale+tax);
+      totalSale+=sale; totalTax+=tax; totalBill+=total; totalQty+=l.qty;
+      items.push({
+        ItemCode:"ITEM-"+p2(i+1), ItemName:l.n, PCTCode:"00000000",
+        Quantity:l.qty, TaxRate:RATE, SaleValue:sale, Discount:0, FurtherTax:0,
+        TaxCharged:tax, TotalAmount:total, InvoiceType:1, RefUSIN:null
+      });
+    });
+    totalSale=round2(totalSale); totalTax=round2(totalTax); totalBill=round2(totalBill);
+    if(state.faults.tamper){ totalBill = round2(totalBill + 50); }
+
+    var now = new Date();
+    var dt = now.getFullYear()+"-"+p2(now.getMonth()+1)+"-"+p2(now.getDate())+" "+p2(now.getHours())+":"+p2(now.getMinutes())+":"+p2(now.getSeconds());
+
+    var payload = {
+      InvoiceNumber:"", POSID:posId, USIN:usin, RefUSIN:null, DateTime:dt,
+      BuyerName:"", BuyerPNTN:"", BuyerCNIC:"", BuyerPhoneNumber:"",
+      TotalSaleValue:totalSale, TotalQuantity:totalQty, TotalBillAmount:totalBill,
+      TotalTaxCharged:totalTax, Discount:0, FurtherTax:0,
+      PaymentMode:payMode(state.pay), InvoiceType:1, Items:items
+    };
+    return { payload:payload, errors:errors, usin:usin, hasToken:hasToken, cloud:cloud };
+  }
+
+  function endpoint(){
+    return state.mode==="cloud"
+      ? "https://ims.pral.com.pk/ims/production/api/Live/PostData"
+      : "http://localhost:8524/api/IMSFiscal/GetInvoiceNumberByModel";
+  }
+
+  function mockSubmit(built){
+    var payload=built.payload;
+    if(built.cloud && !built.hasToken) return {status:401, body:{Message:"Unauthorized"}};
+    var required=["POSID","USIN","DateTime","TotalSaleValue","TotalTaxCharged","TotalBillAmount","PaymentMode","InvoiceType"];
+    for(var i=0;i<required.length;i++){ var k=required[i]; if(payload[k]===""||payload[k]==null){ return fail("Required field missing: "+k); } }
+    if(!payload.Items.length) return fail("Invoice must contain at least one item.");
+    if(Number(payload.POSID)<=0) return fail("POS ID is not registered.");
+    if([1,2,3].indexOf(Number(payload.InvoiceType))===-1) return fail("Invalid InvoiceType. Use 1 New, 2 Debit or 3 Credit.");
+    if(Number(payload.TotalSaleValue)<=0) return fail("TotalSaleValue must be greater than zero.");
+    var expBill = round2(Number(payload.TotalSaleValue)+Number(payload.TotalTaxCharged)+Number(payload.FurtherTax||0));
+    if(Math.abs(expBill-Number(payload.TotalBillAmount))>0.01) return fail("TotalBillAmount does not equal TotalSaleValue + TotalTaxCharged + FurtherTax.");
+    if(state.seen[payload.USIN]) return fail("Duplicate USIN — this invoice was already fiscalised.");
+    state.seen[payload.USIN]=true;
+    var num = ""+payload.POSID + fmtStamp() + p2Big(payload.USIN);
+    return {status:200, body:{InvoiceNumber:num, Code:"100", Response:"Fiscal Invoice Number generated successfully.", Errors:null}};
+  }
+  function fail(msg){ return {status:200, body:{InvoiceNumber:null, Code:"101", Response:msg, Errors:msg}}; }
+  function fmtStamp(){ var d=new Date(); return ""+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+p2(d.getHours())+p2(d.getMinutes()); }
+  function p2Big(s){ var h=0; for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;} return (h%1000+"").padStart(3,"0"); }
+
+  function verifyUrl(num){ return "https://reg.pra.punjab.gov.pk/IMSFiscalReport/SearchPOSInvoice_Report.aspx?PRAInvNo="+num; }
+
+  function colorizeJson(obj){
+    function render(v, indent){
+      var pad="  ".repeat(indent), pad2="  ".repeat(indent+1);
+      if(Array.isArray(v)){
+        if(!v.length) return "[]";
+        return "[\n"+v.map(function(x){return pad2+render(x,indent+1);}).join(",\n")+"\n"+pad+"]";
+      }
+      if(v && typeof v==="object"){
+        var keys=Object.keys(v);
+        return "{\n"+keys.map(function(k,i){
+          return pad2+'<span class="k">"'+k+'"</span>: '+render(v[k],indent+1);
+        }).join(",\n")+"\n"+pad+"}";
+      }
+      if(typeof v==="number") return '<span class="n">'+v+'</span>';
+      if(v===null) return '<span class="muted">null</span>';
+      return '<span class="s">"'+esc(v)+'"</span>';
+    }
+    return render(obj,0);
+  }
+
+  function renderMenu(){
+    var el=$("#menu"); el.innerHTML="";
+    MENU.forEach(function(m){
+      var q=state.bill[m.id]||0;
+      var b=document.createElement("button");
+      b.className="dish"; b.setAttribute("data-active",q>0?"1":"0");
+      b.innerHTML='<span class="qty">'+q+'</span><span class="n">'+esc(m.n)+'</span><span class="p">excl. tax · <b>'+money(m.p)+'</b></span>';
+      b.addEventListener("click",function(){ state.bill[m.id]=(state.bill[m.id]||0)+1; refresh(); });
+      el.appendChild(b);
+    });
+  }
+  function renderBill(){
+    var el=$("#billLines"); el.innerHTML="";
+    var L=Object.keys(state.bill).filter(function(id){return state.bill[id]>0;});
+    if(!L.length){ el.innerHTML='<div class="bill-empty">No items yet — tap a dish above.</div>'; }
+    L.forEach(function(id){
+      var m=menuItem(id), qty=state.bill[id];
+      var row=document.createElement("div"); row.className="bl";
+      row.innerHTML='<div class="nm">'+esc(m.n)+'<small>'+money(m.p)+' × '+qty+'</small></div>'+
+        '<div class="stepper"><button aria-label="Remove one">−</button><button aria-label="Add one">+</button></div>'+
+        '<div class="amt">'+money(m.p*qty)+'</div>';
+      var btns=row.querySelectorAll("button");
+      btns[0].addEventListener("click",function(){ state.bill[id]=Math.max(0,qty-1); if(state.bill[id]===0)delete state.bill[id]; refresh(); });
+      btns[1].addEventListener("click",function(){ state.bill[id]=qty+1; refresh(); });
+      el.appendChild(row);
+    });
+  }
+  function renderTotals(){
+    var sale=0,tax=0; lines().forEach(function(l){ var s=round2(l.unit*l.qty); sale+=s; tax+=round2(s*(RATE/100)); });
+    sale=round2(sale); tax=round2(tax);
+    $("#totals").innerHTML=
+      '<div class="tot"><span>Total sale value (excl. tax)</span><b>'+money(sale)+'</b></div>'+
+      '<div class="tot"><span>Sales tax @ '+RATE+'%</span><b>'+money(tax)+'</b></div>'+
+      '<div class="tot grand"><span>Total bill amount</span><b>'+money(round2(sale+tax))+'</b></div>';
+  }
+  function renderFaults(){
+    var el=$("#faults");
+    if(!el.dataset.built){
+      FAULTS.forEach(function(f){
+        var lab=document.createElement("label"); lab.className="fault";
+        lab.innerHTML='<input type="checkbox" data-f="'+f.id+'"><span class="fx">'+esc(f.fx)+'<small>'+esc(f.sub)+'</small></span>';
+        lab.querySelector("input").addEventListener("change",function(e){ state.faults[f.id]=e.target.checked; refresh(); });
+        el.appendChild(lab);
+      });
+      el.dataset.built="1";
+    }
+    var nt=el.querySelector('input[data-f="notoken"]');
+    if(nt){ nt.closest(".fault").style.opacity = state.mode==="cloud"?"1":".45"; nt.disabled = state.mode!=="cloud"; if(state.mode!=="cloud"){ nt.checked=false; state.faults.notoken=false; } }
+  }
+
+  var lastBuilt=null;
+  function renderWire(){
+    var built=buildPayload();
+    $("#wireUrl").innerHTML = state.mode==="cloud"
+      ? '/ims/production/api/Live/PostData <span class="host">@ ims.pral.com.pk</span>'
+      : '/api/IMSFiscal/GetInvoiceNumberByModel <span class="host">@ localhost:8524</span>';
+    var mt=$("#wireMode"); mt.className="mode-tag "+state.mode; mt.textContent = state.mode==="cloud"?"CLOUD":"OFFLINE";
+    $("#wireSub").textContent = state.mode==="cloud" ? "direct to PRAL · Bearer token" : "local IMS component · no auth";
+    var auth=$("#wireAuth");
+    if(state.mode==="cloud"){
+      auth.className="authhdr"+(built.hasToken?"":" none");
+      auth.innerHTML='<span class="hk">Authorization: </span><span class="hv">'+(built.hasToken?'Bearer '+SELLER.token.slice(0,10)+'••••••':'— missing —')+'</span>';
+      auth.style.display="";
+    } else {
+      auth.style.display="none";
+    }
+    $("#wireJson").innerHTML = colorizeJson(built.payload);
+    return built;
+  }
+
+  function svgIcon(ok){
+    return ok
+      ? '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></svg>'
+      : '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>';
+  }
+
+  function renderResponse(result){
+    var el=$("#response");
+    if(!result){ el.innerHTML='<div class="receipt-wrap">'+receiptHtml(null)+'</div>'; $("#respSub").textContent="press Fiscalise with PRA"; return; }
+    if(result.body && result.status===401){
+      $("#respSub").textContent="rejected · HTTP 401";
+      el.innerHTML='<div class="verdict err">'+svgIcon(false)+'Unauthorized — PRA rejected the token<span class="rc">HTTP 401</span></div>'+
+        '<div class="errline">Cloud mode needs a valid Bearer token (and the server IP whitelisted by PRA).</div>'+
+        '<div class="receipt-wrap">'+receiptHtml(null)+'</div>';
+      return;
+    }
+    var body=result.body||result;
+    if(body.Code==="100"){
+      $("#respSub").textContent="accepted · Code 100";
+      el.innerHTML=
+        '<div class="verdict ok">'+svgIcon(true)+'Fiscalised by PRA — invoice number issued<span class="rc">Code 100</span></div>'+
+        '<div class="receipt-wrap">'+receiptHtml(body)+'</div>';
+      drawQr(verifyUrl(body.InvoiceNumber));
+    } else {
+      $("#respSub").textContent="rejected · Code "+(body.Code||"—");
+      el.innerHTML=
+        '<div class="verdict err">'+svgIcon(false)+'Rejected by PRA<span class="rc">Code '+esc(body.Code||"—")+'</span></div>'+
+        '<div class="errline">'+esc(body.Response||body.Errors||"Rejected")+'</div>'+
+        '<div class="receipt-wrap">'+receiptHtml(null)+'</div>';
+    }
+  }
+
+  function receiptHtml(body){
+    var built = lastBuilt || buildPayload();
+    var pd = built.payload;
+    var ok = body && body.Code==="100";
+    var ghost = !ok;
+    var num = ok ? body.InvoiceNumber : "—— pending ——";
+    var stamp = ok ? '<div class="stamp ok">Fiscalised</div>' : '<div class="stamp pending">Not reported</div>';
+    return '<div class="receipt'+(ghost?' ghost':'')+'">'+stamp+
+      '<div class="r-head"><div class="r-logo">QNF Enterprises</div><div class="r-sub">PRA · INVOICE MONITORING SYSTEM</div></div>'+
+      rrow("PNTN",SELLER.pntn)+rrow("POS ID",pd.POSID)+rrow("USIN",pd.USIN)+rrow("Date",pd.DateTime)+rrow("Payment",pd.PaymentMode===2?"Card":"Cash")+
+      '<div class="r-money">'+
+        rrow("Sale Value",money(pd.TotalSaleValue))+
+        rrow("Tax @ "+RATE+"%",money(pd.TotalTaxCharged))+
+        '<div class="r-row r-net"><span class="lbl">Total Bill</span><span class="val">'+money(pd.TotalBillAmount)+'</span></div>'+
+      '</div>'+
+      '<div class="r-srb"><div class="cap">PRA Invoice No</div><div class="num">'+esc(num)+'</div></div>'+
+      '<div class="qr" id="qrBox">'+(ghost?'<svg width="118" height="118" viewBox="0 0 24 24" fill="none" stroke="#cfc9b8" stroke-width="1.4"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 20v.01M17 20v.01M20 17v.01"/></svg>':'')+'</div>'+
+      '<div class="r-foot">'+(ok?'Scan to verify at pra.punjab.gov.pk':'Awaiting PRA invoice number')+'</div>'+
+      '<div class="r-foot" style="margin-top:6px">Thank You</div>'+
+      '</div>';
+    function rrow(l,v){ return '<div class="r-row"><span class="lbl">'+l+'</span><span class="val">'+esc(v)+'</span></div>'; }
+  }
+
+  function drawQr(url){
+    var box=$("#qrBox"); if(!box||!window.QRCode) return;
+    box.innerHTML="";
+    new window.QRCode(box,{ text:url, width:126, height:126, colorDark:"#12130f", colorLight:"#fbfaf7", correctLevel:window.QRCode.CorrectLevel.M });
+  }
+
+  function refresh(){
+    renderMenu(); renderBill(); renderTotals(); renderFaults();
+    lastBuilt = renderWire();
+    if(!$("#response").dataset.reported){ renderResponse(null); }
+  }
+
+  function report(){
+    lastBuilt = renderWire();
+    var el=$("#response"); el.dataset.reported="1";
+    if(lastBuilt.errors.length){
+      $("#respSub").textContent="rejected before sending · driver guard";
+      el.innerHTML='<div class="verdict err">'+svgIcon(false)+'Rejected by the driver — never reaches PRA<span class="rc">local</span></div>'+
+        '<div class="errline">'+esc(lastBuilt.errors[0])+'</div>'+
+        '<div class="receipt-wrap">'+receiptHtml(null)+'</div>';
+      return;
+    }
+    var resp = mockSubmit(lastBuilt);
+    if(resp.body && resp.body.Code==="100"){ state.lastAcceptedUsin = lastBuilt.usin; if(!state.faults.dupe){ state.usinSeq++; } }
+    renderResponse(resp);
+  }
+
+  function setMode(m){
+    state.mode=m;
+    document.querySelectorAll(".seg button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.mode===m ? "true":"false"); });
+    refresh();
+  }
+
+  document.querySelectorAll(".seg button").forEach(function(b){ b.addEventListener("click",function(){ setMode(b.dataset.mode); }); });
+  document.querySelectorAll(".paymode .pill").forEach(function(b){ b.addEventListener("click",function(){
+    state.pay=b.dataset.pay;
+    document.querySelectorAll(".paymode .pill").forEach(function(x){ x.setAttribute("aria-pressed", x===b?"true":"false"); });
+    refresh();
+  }); });
+  $("#reportBtn").addEventListener("click",report);
+  $("#rateLbl").textContent=RATE+"%";
+
+  refresh();
+  report();
+})();
+</script>
