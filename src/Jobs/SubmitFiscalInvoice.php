@@ -3,13 +3,14 @@
 namespace Nosh\OmniTax\Jobs;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Nosh\OmniTax\Facades\OmniTax;
 use Nosh\OmniTax\Models\FiscalInvoice;
-use Nosh\OmniTax\Responses\FiscalResponse;
 
 /**
  * Submits a persisted FiscalInvoice on the queue.
@@ -18,7 +19,7 @@ use Nosh\OmniTax\Responses\FiscalResponse;
  * never reports the same sale twice — an already-valid record is skipped.
  * 5xx (server) failures retry with backoff; 4xx (client) failures do not.
  */
-class SubmitFiscalInvoice implements ShouldQueue
+class SubmitFiscalInvoice implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable;
     use InteractsWithQueue;
@@ -35,6 +36,14 @@ class SubmitFiscalInvoice implements ShouldQueue
     }
 
     /** @return int[] seconds to wait between attempts */
+    /** One queued job per record: a second dispatch while one waits is dropped. */
+    public function uniqueId(): string
+    {
+        return 'omnitax-invoice-'.$this->record->getKey();
+    }
+
+    public int $uniqueFor = 600;
+
     public function backoff(): array
     {
         return config('omnitax.retry_backoff', [10, 30, 120]);
@@ -42,7 +51,30 @@ class SubmitFiscalInvoice implements ShouldQueue
 
     public function handle(): void
     {
-        // Idempotency guard — already reported, nothing to do.
+        // Two workers must never send the same sale at once — the queue's
+        // uniqueness covers a second DISPATCH, this covers a second RUN (a
+        // retried job overlapping a manual --sync, say). Whoever loses waits.
+        $lock = Cache::lock('omnitax-submit-'.$this->record->getKey(), 120);
+
+        if (! $lock->get()) {
+            $this->release(30);
+
+            return;
+        }
+
+        try {
+            $this->submit();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    protected function submit(): void
+    {
+        $this->record->refresh();
+
+        // Idempotency guard — already reported (by the real-time attempt, or a
+        // duplicate job), nothing to do.
         if ($this->record->status === FiscalInvoice::VALID) {
             return;
         }
@@ -53,20 +85,13 @@ class SubmitFiscalInvoice implements ShouldQueue
         }
 
         $response = $manager->submit($this->record->toInvoice());
-
         $this->record->recordResponse($response);
 
-        // Only retry on transport/server errors — never on a business rejection.
-        if (! $response->isValid() && $this->shouldRetry($response)) {
+        // Only retry when the authority was never reached or failed on its side
+        // — a business rejection will be refused again unchanged.
+        if ($response->isRetryable()) {
             $this->release($this->nextBackoff());
         }
-    }
-
-    protected function shouldRetry(FiscalResponse $response): bool
-    {
-        $status = $response->httpStatus();
-
-        return $status >= 500 || $status === 0; // server error / network
     }
 
     protected function nextBackoff(): int

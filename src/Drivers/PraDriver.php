@@ -5,6 +5,7 @@ namespace Nosh\OmniTax\Drivers;
 use Nosh\OmniTax\Data\Invoice;
 use Nosh\OmniTax\Data\LineItem;
 use Nosh\OmniTax\Responses\FiscalResponse;
+use Nosh\OmniTax\Support\Feature;
 
 /**
  * PRA (Punjab Revenue Authority / PRAL) Software Fiscal Device driver.
@@ -38,6 +39,12 @@ class PraDriver extends AbstractDriver
     /** PRA success code (note: FBR/SRB use "00"; PRA uses "100"). */
     public const SUCCESS_CODE = '100';
 
+    /** InvoiceType 3 (credit / return) with RefUSIN; IMS component on the till. */
+    protected function features(): array
+    {
+        return [Feature::CREDIT_NOTE, Feature::OFFLINE_MODE];
+    }
+
     public function key(): string
     {
         return 'pra';
@@ -67,9 +74,7 @@ class PraDriver extends AbstractDriver
             return new FiscalResponse(valid: false, errors: $errors, raw: ['localValidation' => $errors, 'payload' => $payload], httpStatus: 422);
         }
 
-        $result = $this->transport->post($this->endpoint(), $payload, $this->headers());
-
-        return $this->parse($result['status'] ?? 0, $result['body'] ?? []);
+        return $this->send($this->endpoint(), $payload);
     }
 
     /** PRA publishes no server-to-server reference lists in this spec. */

@@ -6,6 +6,7 @@ use Nosh\OmniTax\Data\Invoice;
 use Nosh\OmniTax\Data\LineItem;
 use Nosh\OmniTax\Responses\FiscalResponse;
 use Nosh\OmniTax\Responses\ItemStatus;
+use Nosh\OmniTax\Support\Feature;
 
 /**
  * FBR (Federal / PRAL) Digital Invoicing driver.
@@ -16,6 +17,15 @@ use Nosh\OmniTax\Responses\ItemStatus;
  */
 class FbrDriver extends AbstractDriver
 {
+    /**
+     * FBR Digital Invoicing validates remotely. It has Sale Invoice and Debit
+     * Note but NO credit note, so a refund cannot be reported as one here.
+     */
+    protected function features(): array
+    {
+        return [Feature::REMOTE_VALIDATION];
+    }
+
     public function key(): string
     {
         return 'fbr';
@@ -50,10 +60,7 @@ class FbrDriver extends AbstractDriver
 
     protected function call(string $url, Invoice $invoice): FiscalResponse
     {
-        $payload = $this->mapInvoice($invoice);
-        $result = $this->transport->post($url, $payload, $this->headers());
-
-        return $this->parse($result['status'] ?? 0, $result['body'] ?? []);
+        return $this->send($url, $this->mapInvoice($invoice));
     }
 
     /**

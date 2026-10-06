@@ -23,7 +23,7 @@ It is **authority‑driven** and **multi‑tenant**: one installation can serve 
 9. [The canonical invoice](#9-the-canonical-invoice)
 10. [Reading the response](#10-reading-the-response)
 11. [Printing the receipt: QR code & logo](#11-printing-the-receipt-qr-code--logo)
-12. [Submitting in the background (recommended)](#12-submitting-in-the-background-recommended)
+12. [Reporting a sale: real time, with a queued fallback (recommended)](#12-reporting-a-sale-real-time-with-a-queued-fallback-recommended)
 13. [Multi‑tenant: one install, many restaurants](#13-multi-tenant-one-install-many-restaurants)
 14. [Reference data (provinces, units, HS codes…)](#14-reference-data-provinces-units-hs-codes)
 15. [Sandbox testing & scenarios](#15-sandbox-testing--scenarios)
@@ -480,9 +480,42 @@ The package renders the QR to the official spec automatically (**Version 2.0, 25
 
 ---
 
-## 12. Submitting in the background (recommended)
+## 12. Reporting a sale: real time, with a queued fallback (recommended)
 
-At a busy restaurant you don't want billing to wait on a government server. Persist the invoice and submit it on a queue — the package tracks status and retries safely.
+At a till you want the fiscal number **on the receipt you are printing**, but you can never let a slow government server hold up a payment. `report()` does both: it tries the authority inline for at most a few seconds, and if that cannot finish it queues the sale and returns immediately.
+
+```php
+$record = OmniTax::for($branch)->report($invoice, reference: "bill:{$bill->id}");
+
+match ($record->status) {
+    FiscalInvoice::VALID   => print_fiscal($record->fiscalNumber(), $record->qr()), // accepted
+    FiscalInvoice::PENDING => print_pending_note(),   // authority slow/down — queued, retried
+    FiscalInvoice::FAILED  => alert($record->last_error), // rejected: fix data/credentials
+};
+```
+
+| Outcome | Record status | Queued? |
+|---|---|---|
+| Accepted inside the time limit | `valid` — `fiscal_number`, `qr_payload` set | no |
+| Authority unreachable, timed out, or 5xx | `pending` — `last_error` says why | **yes** (after your DB transaction commits) |
+| Rejected (bad data, credentials, 4xx) | `failed` — `last_error` has the authority's reason | no — the same payload would be refused again |
+
+Configure it in `config/omnitax.php` (or `.env`):
+
+```dotenv
+FISCAL_REALTIME=true          # false = never attempt inline, always queue
+FISCAL_REALTIME_TIMEOUT=3     # seconds the inline attempt may take
+```
+
+You can also force either behaviour per call: `report($invoice, realtime: false)`, or cap any call yourself with `OmniTax::timeout(2.5)->submit($invoice)`.
+
+**Idempotent:** `report()` on a sale that is already accepted returns its record without calling the authority, so a retried request or a reprint can never report a sale twice. **Always give each sale its own number** with `->number()` — it is what makes the idempotency key unique (two identical sales on one day are still two sales).
+
+`reference` is your own key for the sale. Look the fiscal documents up later with `FiscalInvoice::forReference("bill:42")->get()` (the sale and any credit notes). Each record also keeps `attempts` and `last_error` for operators, and scopes `pending()`, `failed()` and `reported()`.
+
+### 12a. Submitting in the background only
+
+The lower-level building blocks `report()` uses, if you want to queue without any inline attempt and drive the record yourself:
 
 ```php
 use Nosh\OmniTax\Models\FiscalInvoice;
@@ -494,7 +527,7 @@ SubmitFiscalInvoice::dispatch($record);           // onto the 'fiscal-invoices' 
 
 // Later / elsewhere:
 $record->refresh();
-$record->status();          // pending | submitted | valid | failed
+$record->status();          // pending | valid | failed
 $record->fiscalNumber();    // once accepted
 $record->qr();
 ```
@@ -505,7 +538,52 @@ Run a worker for the dedicated queue:
 php artisan queue:work --queue=fiscal-invoices
 ```
 
-**Idempotency:** each invoice carries a stable key, so a retry (or a double‑click at the till) **never reports the same sale twice**. Failed jobs back off and retry up to `FISCAL_RETRY_ATTEMPTS`; server (5xx) errors are retried, client (4xx) errors are not.
+**Idempotency:** each invoice carries a stable key, so a retry (or a double‑click at the till) **never reports the same sale twice**. The job backs off and retries up to `FISCAL_RETRY_ATTEMPTS` when the authority is unreachable or returns 5xx (the record stays `pending`); a rejection marks it `failed` and is not retried. Anything still `pending` after that is picked up by `fiscal:submit-pending`.
+
+### 12b. Refunds: credit notes
+
+A refund is a **new document** that references the original sale — never a resubmission of it:
+
+```php
+use Nosh\OmniTax\Support\Feature;
+
+if (OmniTax::for($branch)->supports(Feature::CREDIT_NOTE)) {
+    $creditNote = (new InvoiceBuilder())
+        ->number("R-{$refund->id}")                                    // its own number
+        ->creditNoteFor($bill->number, $original->fiscalNumber())       // your no. + the authority's
+        ->addItem(/* the refunded lines */)
+        ->build();
+
+    OmniTax::for($branch)->report($creditNote, reference: "bill:{$bill->id}");
+}
+```
+
+| Authority | Credit note |
+|---|---|
+| PRA | ✅ `InvoiceType` 3 with `RefUSIN` |
+| SRB | ✅ `invoiceType` 2 (sales return) |
+| FBR Digital Invoicing | ❌ no credit note — a credit note sent to FBR is **rejected locally** with a clear message, never sent as an ordinary sale |
+
+### 12c. "Test connection" and feature checks
+
+For a settings page:
+
+```php
+$check = OmniTax::for($branch)->check();
+
+$check->ok();               // everything passed
+$check->failure();          // the first problem, in plain words
+$check->checks();           // credentials → seller → authority → validate, each with ok + message
+$check->reachedAuthority(); // true only when the authority itself was asked (FBR validate);
+                            // PRA/SRB publish no test endpoint, so their check is local
+```
+
+`OmniTax::for($branch)->isConfigured()` is a cheap "are credentials saved at all?" for gating UI, and `supports(Feature::CREDIT_NOTE | Feature::OFFLINE_MODE | Feature::REMOTE_VALIDATION)` tells you what an authority can do before you try.
+
+### 12d. Network behaviour
+
+- A network failure (DNS, refused, TLS, timeout) is **returned** as `httpStatus() === 0`, never thrown, and `FiscalResponse::isRetryable()` is true for it and for 5xx. The queued job and `report()` both rely on this.
+- **IP whitelisting (PRA cloud):** PRA allows only your registered server IP. A dual-stack server may leave over IPv6 and be refused — set `FISCAL_FORCE_IPV4=true`. `FISCAL_CONNECT_TIMEOUT` caps the connect phase separately.
 
 ---
 

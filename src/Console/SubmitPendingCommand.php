@@ -8,13 +8,16 @@ use Nosh\OmniTax\Models\FiscalInvoice;
 
 class SubmitPendingCommand extends Command
 {
-    protected $signature = 'fiscal:submit-pending {--authority=} {--sync : run inline instead of queueing}';
+    protected $signature = 'fiscal:submit-pending {--authority=} {--older-than=5 : minutes a record must have waited, so a sale whose job is still queued is not sent twice} {--sync : run inline instead of queueing}';
 
     protected $description = 'Dispatch any pending fiscal invoices for submission.';
 
     public function handle(): int
     {
-        $query = FiscalInvoice::whereIn('status', [FiscalInvoice::PENDING, FiscalInvoice::FAILED]);
+        // PENDING only. A FAILED record was rejected by the authority and will be
+        // rejected again unchanged — that is fiscal:retry-failed, after a fix.
+        $query = FiscalInvoice::pending()
+            ->where('updated_at', '<=', now()->subMinutes((int) $this->option('older-than')));
         if ($this->option('authority')) {
             $query->where('authority', $this->option('authority'));
         }

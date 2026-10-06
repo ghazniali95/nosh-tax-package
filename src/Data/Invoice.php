@@ -50,6 +50,14 @@ class Invoice
     /**
      * A stable idempotency key for this sale, so retries / double-clicks
      * never report the same invoice twice.
+     *
+     * Precedence: an explicit key, then YOUR invoice number (`->number()`), then
+     * a hash of the content. The number is what makes a sale unique — before
+     * v1.2 it was left out, so two identical sales on one day (two walk-ins
+     * each buying one burger) hashed to the same key and the second was merged
+     * into the first and never reported. Always give a sale its number; the
+     * content hash is a fallback, and it now includes the timestamp, buyer and
+     * meta so it is only as collision-prone as the data you leave out.
      */
     public function key(): string
     {
@@ -57,13 +65,32 @@ class Invoice
             return $this->idempotencyKey;
         }
 
+        $number = $this->meta['invoiceId'] ?? $this->meta['usin'] ?? null;
+
+        if ($number !== null && $number !== '') {
+            return $this->idempotencyKey = hash('sha256', json_encode([
+                'v2', $this->type, $this->seller?->ntncnic, (string) $number, $this->invoiceRefNo,
+            ]));
+        }
+
         return $this->idempotencyKey = hash('sha256', json_encode([
+            'v2',
             $this->type,
             $this->date,
             $this->seller?->ntncnic,
+            $this->buyer?->ntncnic,
             $this->invoiceRefNo,
+            $this->meta,
             array_map(fn (LineItem $i) => $i->toArray(), $this->items),
         ]));
+    }
+
+    /** Is this a credit note / sales return (refund) rather than a sale? */
+    public function isCreditNote(): bool
+    {
+        $t = strtolower($this->type);
+
+        return str_contains($t, 'credit') || str_contains($t, 'return') || str_contains($t, 'refund');
     }
 
     public function toArray(): array
