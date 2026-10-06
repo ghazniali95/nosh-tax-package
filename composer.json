@@ -1,6 +1,6 @@
 {
     "name": "nosh/omnitax",
-    "description": "OmniTax — a Laravel package for Pakistan's fiscal (digital) invoicing. It connects a business's system to its tax authority in real time to obtain an official fiscal invoice number and QR code. Built for Pakistan's FBR and tax system: it currently ships FBR (federal / PRAL) integration, with provincial (PRA, SRB, KPRA, BRA) and further tax-authority integrations planned. Authority-driven, multi-tenant, and extensible to more authorities by design. A Nosh (RapidFlow) package.",
+    "description": "OmniTax — a Laravel package for Pakistan's fiscal (digital) invoicing. It connects a business's system to its tax authority in real time to obtain an official fiscal invoice number and QR code. Built for Pakistan's FBR and tax system: it currently ships FBR (federal / PRAL), SRB (Sindh) and PRA (Punjab) integrations, with KPRA, BRA and further tax-authority integrations planned. Authority-driven, multi-tenant, and extensible to more authorities by design. A Nosh (RapidFlow) package.",
     "type": "library",
     "license": "MIT",
     "keywords": ["laravel", "omnitax", "fbr", "pral", "digital-invoicing", "fiscal", "pakistan", "pra", "srb", "kpra", "bra", "e-invoice", "tax"],

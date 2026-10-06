@@ -4,7 +4,7 @@
 
 `nosh/omnitax` lets any restaurant, café, or retail business issue **government‑compliant invoices** — the kind that carry an official fiscal invoice number and a QR code — directly from their own system. You build one plain invoice; the package reports it to the correct tax authority in real time, gets back the official invoice number, and hands you a print‑ready QR code and logo for the customer's receipt.
 
-**What's included today, and what's coming:** OmniTax is made first and foremost for **Pakistan's FBR and tax system**. Right now it ships a complete, live **FBR (federal / PRAL) integration**. The **provincial authorities** that most restaurants report to — **PRA (Punjab), SRB (Sindh), KPRA (KP), BRA (Balochistan)** — are on the roadmap (§2), and because the package is authority‑driven, adding each one (and, by design, tax systems in other countries later) is a new driver, not a rewrite of your billing code.
+**What's included today, and what's coming:** OmniTax is made first and foremost for **Pakistan's FBR and tax system**. Right now it ships complete **FBR (federal / PRAL)**, **SRB (Sindh)** and **PRA (Punjab)** integrations — SRB and PRA in both cloud and offline modes. **KPRA (KP)** and **BRA (Balochistan)** are on the roadmap (§2), and because the package is authority‑driven, adding each one (and, by design, tax systems in other countries later) is a new driver, not a rewrite of your billing code.
 
 It is **authority‑driven** and **multi‑tenant**: one installation can serve many businesses, each connected to its own tax authority with its own credentials.
 
