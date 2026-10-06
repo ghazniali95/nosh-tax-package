@@ -22,6 +22,8 @@ use Nosh\OmniTax\Responses\FiscalResponse;
 use Nosh\OmniTax\Support\Qr\Logo;
 use Nosh\OmniTax\Transport\HttpTransport;
 use Nosh\OmniTax\Transport\MockTransport;
+use Nosh\OmniTax\Transport\PraMockTransport;
+use Nosh\OmniTax\Transport\SrbMockTransport;
 
 /**
  * The class behind the Fiscal facade.
@@ -141,7 +143,7 @@ class FiscalManager
             );
         }
 
-        return new $driverClass($credentials, $authConfig, $this->transport());
+        return new $driverClass($credentials, $authConfig, $this->transport($authKey));
     }
 
     public function credentials(): Credentials
@@ -177,7 +179,7 @@ class FiscalManager
         };
     }
 
-    public function transport(): Transport
+    public function transport(?string $authority = null): Transport
     {
         $mode = $this->config['transport'] ?? 'http';
 
@@ -185,9 +187,17 @@ class FiscalManager
             return $this->container->make(Transport::class);
         }
 
-        return $mode === 'mock'
-            ? new MockTransport()
-            : new HttpTransport((int) ($this->config['timeout'] ?? 30));
+        if ($mode === 'mock') {
+            // Each authority's mock returns responses in that authority's own
+            // documented shape.
+            return match ($authority ?? $this->authority ?? $this->config['default'] ?? 'fbr') {
+                'srb'   => new SrbMockTransport(),
+                'pra'   => new PraMockTransport(),
+                default => new MockTransport(),
+            };
+        }
+
+        return new HttpTransport((int) ($this->config['timeout'] ?? 30));
     }
 
     // ---- Engine -----------------------------------------------------------

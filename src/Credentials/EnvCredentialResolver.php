@@ -26,6 +26,11 @@ class EnvCredentialResolver implements CredentialResolver
             sandbox: (bool) ($this->config['sandbox'] ?? true),
             seller: Seller::fromArray($this->config['seller'] ?? []),
             tenantId: null,
+            // SRB-specific (harmless nulls for authorities that don't use them).
+            posId: isset($authConfig['pos_id']) ? (string) $authConfig['pos_id'] : null,
+            posUser: $authConfig['pos_user'] ?? null,
+            posPass: $authConfig['pos_pass'] ?? null,
+            mode: $authConfig['mode'] ?? null,
         );
     }
 }

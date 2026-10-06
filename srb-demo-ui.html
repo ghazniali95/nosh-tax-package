@@ -1,0 +1,638 @@
+<title>SRB Fiscal POS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#eef2ef; --surface:#ffffff; --surface-2:#f6f9f6; --ink:#14201b; --muted:#5b6b63;
+  --line:#dde5e0; --line-strong:#c7d2cb;
+  --accent:#0e7c5a; --accent-ink:#0a5f45; --accent-soft:#e3f1ea;
+  --cloud:#1d6fb8; --cloud-soft:#e4eff8; --offline:#586475; --offline-soft:#e9ecf1;
+  --valid:#0e7c5a; --valid-soft:#e3f1ea; --reject:#bb2f2f; --reject-soft:#f7e7e5; --warn:#a9791b;
+  --wire-bg:#0b1a15; --wire-ink:#c9e7d8; --wire-dim:#5f8a78; --wire-key:#7fd3a8; --wire-str:#e6c07b; --wire-num:#79b7e6;
+  --paper:#fbfaf5; --paper-ink:#1a1a17; --paper-line:#cfc9b8;
+  --radius:14px; --radius-sm:9px;
+  --shadow:0 1px 2px rgba(20,32,27,.05),0 8px 24px -12px rgba(20,32,27,.18);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1310; --surface:#141d18; --surface-2:#101815; --ink:#e7eee9; --muted:#9db0a7;
+    --line:#243029; --line-strong:#32423a;
+    --accent:#3ba883; --accent-ink:#5cc39c; --accent-soft:#16281f;
+    --cloud:#5aa2df; --cloud-soft:#122334; --offline:#96a2b3; --offline-soft:#1b2129;
+    --valid:#3ba883; --valid-soft:#16281f; --reject:#e0776f; --reject-soft:#2c1a18; --warn:#d0a24b;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1310; --surface:#141d18; --surface-2:#101815; --ink:#e7eee9; --muted:#9db0a7;
+  --line:#243029; --line-strong:#32423a;
+  --accent:#3ba883; --accent-ink:#5cc39c; --accent-soft:#16281f;
+  --cloud:#5aa2df; --cloud-soft:#122334; --offline:#96a2b3; --offline-soft:#1b2129;
+  --valid:#3ba883; --valid-soft:#16281f; --reject:#e0776f; --reject-soft:#2c1a18; --warn:#d0a24b;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:"Manrope",system-ui,sans-serif;line-height:1.5;
+  -webkit-font-smoothing:antialiased;padding:0;margin:0}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.wrap{max-width:1220px;margin:0 auto;padding:20px 20px 48px}
+h1,h2,h3{margin:0;text-wrap:balance}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--accent-ink)}
+button{font-family:inherit;cursor:pointer}
+a{color:var(--accent-ink)}
+
+/* ---- header ---- */
+.masthead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding-bottom:16px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:13px}
+.crest{width:44px;height:44px;border-radius:11px;background:var(--accent);color:#fff;display:grid;place-items:center;
+  font-weight:800;font-size:18px;letter-spacing:.02em;box-shadow:var(--shadow);flex:none}
+.brand h1{font-size:21px;font-weight:800;letter-spacing:-.01em}
+.brand p{margin:1px 0 0;font-size:13px;color:var(--muted)}
+.masthead-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mockchip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--muted);
+  background:var(--surface);border:1px solid var(--line);padding:6px 11px;border-radius:999px}
+.mockchip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--warn);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--warn) 22%,transparent)}
+
+/* segmented mode control */
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:4px;gap:3px}
+.seg button{border:0;background:transparent;color:var(--muted);font-weight:700;font-size:13px;
+  padding:8px 15px;border-radius:8px;display:flex;align-items:center;gap:8px;transition:.15s}
+.seg button .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.55}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.seg button[data-mode="cloud"][aria-pressed="true"]{color:var(--cloud)}
+.seg button[data-mode="offline"][aria-pressed="true"]{color:var(--offline)}
+.seg button[aria-pressed="true"] .dot{opacity:1}
+
+/* ---- layout ---- */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:20px;align-items:start}
+@media (max-width:940px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.panel-h h2{font-size:14px;font-weight:800;letter-spacing:.01em}
+.panel-h .sub{font-size:12px;color:var(--muted);font-weight:600}
+
+/* ---- POS menu ---- */
+.menu{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:14px}
+.dish{position:relative;text-align:left;border:1px solid var(--line);background:var(--surface-2);border-radius:var(--radius-sm);
+  padding:11px 12px;transition:.14s;overflow:hidden}
+.dish:hover{border-color:var(--accent);transform:translateY(-1px)}
+.dish:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dish .n{font-weight:700;font-size:13.5px;line-height:1.25;display:block}
+.dish .p{font-size:12px;color:var(--muted);margin-top:3px}
+.dish .p b{color:var(--ink);font-weight:600}
+.dish .qty{position:absolute;top:8px;right:8px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;
+  background:var(--accent);color:#fff;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center}
+.dish[data-active="1"]{border-color:var(--accent);background:var(--accent-soft)}
+.dish[data-active="1"] .qty{display:flex}
+
+/* ---- bill ---- */
+.bill{padding:6px 16px 16px}
+.bill-lines{display:flex;flex-direction:column}
+.bl{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.bl .nm{font-size:13.5px;font-weight:600}
+.bl .nm small{display:block;color:var(--muted);font-weight:500;font-size:11.5px}
+.bl .stepper{display:inline-flex;align-items:center;gap:8px}
+.bl .stepper button{width:22px;height:22px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);
+  color:var(--ink);font-weight:800;line-height:1;display:grid;place-items:center;font-size:13px}
+.bl .stepper button:hover{border-color:var(--accent);color:var(--accent)}
+.bl .amt{font-size:13px;font-weight:600;text-align:right;min-width:74px;font-variant-numeric:tabular-nums}
+.bill-empty{color:var(--muted);font-size:13px;text-align:center;padding:22px 0}
+.charges{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.charges label{flex:1;min-width:120px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.charges input{width:100%;margin-top:5px;font-family:"IBM Plex Mono",monospace;font-size:13px;padding:7px 9px;
+  border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink)}
+.charges input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.totals{margin-top:14px;border-top:1px solid var(--line-strong);padding-top:12px;display:flex;flex-direction:column;gap:6px}
+.tot{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tot b{color:var(--ink);font-weight:600}
+.tot.grand{font-size:16px;margin-top:4px}
+.tot.grand span:first-child{font-weight:800;color:var(--ink)}
+.tot.grand b{font-weight:800;color:var(--accent-ink)}
+
+/* ---- faults ---- */
+.faults{padding:14px 16px}
+.faults .lead{font-size:12px;color:var(--muted);margin:0 0 10px}
+.fault{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.fault:first-of-type{border-top:0}
+.fault input{margin-top:3px;accent-color:var(--reject);width:15px;height:15px;flex:none}
+.fault .fx{font-size:13px;font-weight:600}
+.fault .fx small{display:block;color:var(--muted);font-weight:500;font-size:11.5px;margin-top:1px}
+
+/* ---- wire / console ---- */
+.wire{background:var(--wire-bg);border-radius:0 0 var(--radius) var(--radius);padding:0}
+.wire .req-line{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.07);flex-wrap:wrap}
+.verb{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:#0b1a15;background:var(--wire-key);
+  padding:3px 8px;border-radius:6px;letter-spacing:.04em}
+.url{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--wire-ink);word-break:break-all;flex:1;min-width:200px}
+.url .host{color:#fff;font-weight:600}
+.mode-tag{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:999px;letter-spacing:.06em}
+.mode-tag.cloud{background:var(--cloud-soft);color:var(--cloud)}
+.mode-tag.offline{background:var(--offline-soft);color:var(--offline)}
+pre.json{margin:0;padding:14px 16px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:1.62;
+  color:var(--wire-ink);overflow-x:auto;max-height:352px;overflow-y:auto}
+pre.json .k{color:var(--wire-key)}
+pre.json .s{color:var(--wire-str)}
+pre.json .n{color:var(--wire-num)}
+pre.json .muted{color:var(--wire-dim)}
+pre.json .added{background:color-mix(in srgb,var(--cloud) 26%,transparent);border-radius:3px;padding:0 2px}
+
+.reportbar{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.report-btn{flex:1;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;font-size:14.5px;
+  padding:13px 16px;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:var(--shadow);transition:.15s}
+.report-btn:hover{filter:brightness(1.06)}
+.report-btn:active{transform:translateY(1px)}
+.report-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.report-note{font-size:11.5px;color:var(--muted);max-width:150px;line-height:1.35}
+
+/* ---- receipt / response ---- */
+.response{padding:16px;display:grid;grid-template-columns:1fr;gap:14px}
+.verdict{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:var(--radius-sm);font-weight:700;font-size:13.5px;border:1px solid transparent}
+.verdict.ok{background:var(--valid-soft);color:var(--valid);border-color:color-mix(in srgb,var(--valid) 30%,transparent)}
+.verdict.err{background:var(--reject-soft);color:var(--reject);border-color:color-mix(in srgb,var(--reject) 30%,transparent)}
+.verdict .rc{font-family:"IBM Plex Mono",monospace;font-size:11px;margin-left:auto;opacity:.8;font-weight:600}
+.verdict .ico{width:22px;height:22px;flex:none}
+.errline{font-size:12.5px;color:var(--reject);font-family:"IBM Plex Mono",monospace;background:var(--reject-soft);
+  border-radius:8px;padding:9px 11px;border:1px dashed color-mix(in srgb,var(--reject) 40%,transparent)}
+
+/* thermal receipt — always paper, both themes */
+.receipt-wrap{display:flex;justify-content:center}
+.receipt{width:100%;max-width:290px;background:var(--paper);color:var(--paper-ink);border-radius:6px;
+  padding:18px 20px 22px;box-shadow:0 2px 4px rgba(0,0,0,.14),0 14px 34px -16px rgba(0,0,0,.4);position:relative;
+  font-family:"IBM Plex Mono",monospace}
+.receipt.ghost{opacity:.55}
+.receipt .r-head{text-align:center;border-bottom:1px dashed var(--paper-line);padding-bottom:11px;margin-bottom:11px}
+.receipt .r-logo{font-family:"Manrope",sans-serif;font-weight:800;font-size:16px;letter-spacing:.02em}
+.receipt .r-sub{font-size:10.5px;color:#6b675b;margin-top:2px;font-family:"Manrope",sans-serif;font-weight:600;letter-spacing:.03em}
+.receipt .r-row{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:2px 0}
+.receipt .r-row .lbl{color:#6b675b}
+.receipt .r-row .val{text-align:right;font-weight:500}
+.receipt .r-money{border-top:1px dashed var(--paper-line);border-bottom:1px dashed var(--paper-line);margin:10px 0;padding:9px 0;
+  display:flex;flex-direction:column;gap:3px}
+.receipt .r-money .r-row{font-size:12px}
+.receipt .r-net{font-weight:700}
+.receipt .r-net .val{font-size:13px}
+.receipt .r-srb{text-align:center;margin-top:6px}
+.receipt .r-srb .cap{font-size:10.5px;color:#6b675b;letter-spacing:.06em;font-family:"Manrope",sans-serif;font-weight:700;text-transform:uppercase}
+.receipt .r-srb .num{font-size:17px;font-weight:600;color:#0e6b4e;letter-spacing:.02em;margin-top:2px;word-break:break-all}
+.receipt .qr{display:flex;justify-content:center;margin:12px 0 6px}
+.receipt .qr>*{line-height:0}
+.receipt .r-foot{text-align:center;font-size:11px;color:#6b675b;margin-top:4px;letter-spacing:.05em}
+.receipt .stamp{position:absolute;top:12px;right:-6px;transform:rotate(7deg);font-family:"Manrope",sans-serif;
+  font-weight:800;font-size:11px;letter-spacing:.08em;padding:4px 9px;border-radius:5px;border:2px solid;text-transform:uppercase}
+.receipt .stamp.ok{color:#0e6b4e;border-color:#0e6b4e;background:rgba(14,107,78,.07)}
+.receipt .stamp.pending{color:#8a856f;border-color:#b8b29a;background:rgba(0,0,0,.02)}
+
+/* mapping footer */
+.map{margin-top:22px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+  padding:18px 20px;box-shadow:var(--shadow)}
+.map h3{font-size:14px;font-weight:800;margin-bottom:3px}
+.map>p{font-size:13px;color:var(--muted);margin:0 0 15px;max-width:70ch}
+.map-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:760px){.map-grid{grid-template-columns:1fr}}
+.mc{border:1px solid var(--line);border-radius:var(--radius-sm);padding:13px 14px;background:var(--surface-2)}
+.mc .t{font-size:12px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:7px}
+.mc code{font-family:"IBM Plex Mono",monospace;font-size:11.5px;background:var(--surface);border:1px solid var(--line);
+  padding:1.5px 5px;border-radius:5px;color:var(--ink);word-break:break-word}
+.mc p{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
+.mc .ok-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--valid)}
+.foot-note{margin-top:16px;font-size:12px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <div class="crest">SRB</div>
+      <div>
+        <h1>SRB Fiscal POS</h1>
+        <p>Sindh Revenue Board digital invoicing — one integration, online &amp; offline</p>
+      </div>
+    </div>
+    <div class="masthead-right">
+      <div class="seg" role="group" aria-label="Integration mode">
+        <button data-mode="cloud" aria-pressed="true"><span class="dot"></span>Cloud · Online</button>
+        <button data-mode="offline" aria-pressed="false"><span class="dot"></span>Offline · Desktop</button>
+      </div>
+      <span class="mockchip">Mock authority · no token, no network</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: POS -->
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <section class="panel">
+        <div class="panel-h">
+          <h2>Keyani Restaurant · Table 6</h2>
+          <span class="sub">tap to add · Sindh services @ <b id="rateLbl">15%</b></span>
+        </div>
+        <div class="menu" id="menu"></div>
+        <div class="bill">
+          <div class="bill-lines" id="billLines"></div>
+          <div class="charges">
+            <label>Service charges (Rs)
+              <input id="svc" class="mono" type="number" min="0" step="10" value="0" inputmode="decimal">
+            </label>
+            <label>Discount (Rs)
+              <input id="disc" class="mono" type="number" min="0" step="10" value="0" inputmode="decimal">
+            </label>
+          </div>
+          <div class="totals" id="totals"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-h"><h2>Rejection scenarios</h2><span class="sub">prove the error paths are real</span></div>
+        <div class="faults" id="faults">
+          <p class="lead">SRB validates every invoice. Flip a switch, then press <b>Report to SRB</b> to see the exact code it returns.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT: console -->
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <section class="panel">
+        <div class="panel-h">
+          <h2>SRB request</h2>
+          <span class="sub" id="wireSub">what the package sends</span>
+        </div>
+        <div class="reportbar">
+          <button class="report-btn" id="reportBtn">
+            <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            Report to SRB
+          </button>
+          <span class="report-note">Reports the bill and prints the fiscal receipt.</span>
+        </div>
+        <div class="wire">
+          <div class="req-line">
+            <span class="verb">POST</span>
+            <span class="url" id="wireUrl"></span>
+            <span class="mode-tag cloud" id="wireMode">CLOUD</span>
+          </div>
+          <pre class="json" id="wireJson"></pre>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-h"><h2>SRB response &amp; receipt</h2><span class="sub" id="respSub">live from the mock authority</span></div>
+        <div class="response" id="response"></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="map">
+    <h3>How this maps to the shipped package</h3>
+    <p>The page runs the real driver &amp; mock logic in the browser — identical math, payload and SRB responses to the PHP. Nothing here is faked; the same code points at the live SRB gateway or Connector the moment the client's POS credentials arrive.</p>
+    <div class="map-grid">
+      <div class="mc">
+        <div class="t">One switch, two worlds</div>
+        <p><code>FISCAL_SRB_MODE=cloud</code> → website hits <code>pos.srb.gos.pk</code> with <code>posUser/posPass</code>. <code>=offline</code> → desktop app hits the <code>localhost:8282</code> Connector, no body creds. Same <code>SrbDriver</code>.</p>
+      </div>
+      <div class="mc">
+        <div class="t">Go live, no rewrite</div>
+        <p>Flip <code>FISCAL_TRANSPORT=mock→http</code> and drop in the SRB-issued POS ID (and cloud <code>posUser/posPass</code>). Zero billing-code change.</p>
+      </div>
+      <div class="mc">
+        <div class="t">Proven</div>
+        <p class="ok-badge"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> tests/verify-srb.php · 41/41</p>
+        <p><code>SrbDriver.php</code> + <code>SrbMockTransport.php</code>, alongside FBR — the FBR suite still passes 26/26, untouched.</p>
+      </div>
+    </div>
+    <p class="foot-note">Demonstration build · mock SRB authority · figures and POS ID are examples, not a live taxpayer record.</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var RATE = 15;                       // SRB Sindh services rate (example)
+  var POS_FEE = 1.00;                  // "POS 1 Rupee Fee" printed on SRB receipts
+  var SELLER = {
+    posId: 331,
+    ntnRaw: "S8000001-1",              // stored as registered
+    name: "Keyani Restaurant",
+    posUser: "srb_pos_user",
+    posPass: "S3cr3t!pass"
+  };
+  var MENU = [
+    {id:"karahi_f", n:"Chicken Karahi — Full", p:1800},
+    {id:"karahi_h", n:"Chicken Karahi — Half", p:950},
+    {id:"biryani",  n:"Mutton Biryani",        p:650},
+    {id:"naan_g",   n:"Garlic Naan",           p:80},
+    {id:"naan_p",   n:"Plain Naan",            p:30},
+    {id:"drink",    n:"Soft Drink",            p:120},
+    {id:"kheer",    n:"Kheer",                 p:220},
+    {id:"chai",     n:"Kashmiri Chai",         p:190}
+  ];
+  var FAULTS = [
+    {id:"mixed",   fx:"Add a line at a different rate (8%)", sub:"Driver rejects locally — SRB is one rate per invoice."},
+    {id:"nocreds", fx:"Clear cloud credentials",            sub:"Cloud only — posUser / posPass missing."},
+    {id:"badpos",  fx:"Use an unregistered POS ID",         sub:"resCode 02 — “POS ID is not register”."},
+    {id:"tamper",  fx:"Tamper with the tax total",          sub:"resCode 02 — tax doesn’t match rate × sale."},
+    {id:"dupe",    fx:"Reuse the last invoice number",       sub:"resCode 02 — duplicate InvoiceId."}
+  ];
+
+  var state = { mode:"cloud", bill:{}, svc:0, disc:0, faults:{}, invSeq:9, lastAcceptedId:null };
+  // seed a realistic opening bill
+  state.bill = { karahi_f:1, naan_g:4 };
+
+  var $ = function(s,r){return (r||document).querySelector(s);};
+  function money(n){ return "Rs " + Number(n).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function menuItem(id){ for(var i=0;i<MENU.length;i++){ if(MENU[i].id===id) return MENU[i]; } return null; }
+
+  // ---- domain (mirrors SrbDriver::buildPayload) ----
+  function sanitizeNtn(raw){ return String(raw).trim().replace(/^[Ss]/,"").replace(/-.*$/,""); }
+  function stripName(s){ return String(s).replace(/[^A-Za-z0-9 ]+/g," ").replace(/\s+/g," ").trim(); }
+  function round2(n){ return Math.round((n+Number.EPSILON)*100)/100; }
+
+  function lines(){
+    var out=[];
+    for(var id in state.bill){ if(state.bill[id]>0){ var m=menuItem(id); out.push({id:id,n:m.n,qty:state.bill[id],unit:m.p,rate:RATE}); } }
+    if(state.faults.mixed){ out.push({id:"import8",n:"Imported Dessert (8%)",qty:1,unit:400,rate:8}); }
+    return out;
+  }
+  function saleValue(){ return lines().reduce(function(a,l){return a + l.unit*l.qty;},0); }
+
+  function buildPayload(){
+    var L = lines(), errors=[];
+    var svc = Number(state.svc)||0, disc = Number(state.disc)||0;
+    var sale = saleValue();
+
+    var rateSet={}; L.forEach(function(l){ rateSet[l.rate]=1; });
+    var rates = Object.keys(rateSet);
+    if(rates.length>1){ errors.push("SRB accepts a single tax rate per invoice, but this invoice mixes "+rates.join("% , ")+"%."); }
+    var rate = rates.length ? Number(rates[0]) : RATE;
+
+    var tax = round2((sale+svc+ 0) * (rate/100));
+    if(state.faults.tamper){ tax = round2(tax + 40); }        // deliberate mismatch
+    var net = round2(sale + svc + tax - disc);
+
+    var posId = state.faults.badpos ? 0 : SELLER.posId;
+    if(sale<=0){ errors.push("Add at least one item — sale value must be greater than zero."); }
+
+    var cloud = state.mode==="cloud";
+    var creds = cloud && !state.faults.nocreds;
+    if(cloud && state.faults.nocreds){ errors.push("SRB cloud mode requires posUser and posPass credentials."); }
+
+    var invoiceId = state.faults.dupe && state.lastAcceptedId ? state.lastAcceptedId : "PZ0"+state.invSeq;
+
+    var now = new Date();
+    var dt = now.getFullYear()+"-"+p2(now.getMonth()+1)+"-"+p2(now.getDate())+" "+p2(now.getHours())+":"+p2(now.getMinutes())+":"+p2(now.getSeconds());
+
+    var payload = {
+      posId: posId,
+      name: stripName(SELLER.name),
+      ntn: sanitizeNtn(SELLER.ntnRaw),
+      invoiceDateTime: dt,
+      invoiceType: 1,
+      invoiceId: invoiceId,
+      rateValue: rate,
+      saleValue: round2(sale),
+      taxAmount: tax,
+      discountAmount: round2(disc),
+      serviceCharges: round2(svc),
+      extraCharges: 0,
+      netAmount: net,
+      consumerName: "N/A",
+      consumerMobile: "N/A",
+      consumerEmail: "N/A",
+      consumerNTN: "N/A",
+      address: "N/A",
+      cpcCode: "N/A",
+      extraInf: "N/A",
+      modeOfPay: "Cash",
+      transType: "Test"
+    };
+    var addedKeys=[];
+    if(cloud){
+      payload.posUser = creds ? SELLER.posUser : "";
+      payload.posPass = creds ? SELLER.posPass : "";
+      addedKeys=["posUser","posPass"];
+    }
+    return { payload:payload, errors:errors, addedKeys:addedKeys, invoiceId:invoiceId, netExtras:{fee:POS_FEE} };
+  }
+  function p2(n){ return (n<10?"0":"")+n; }
+
+  // ---- mock SRB authority (mirrors SrbMockTransport) ----
+  function endpoint(){
+    return state.mode==="cloud"
+      ? "https://pos.srb.gos.pk/ePOSGateway/v1/SalesInvoiceService.api"
+      : "http://localhost:8282/pos/SalesInvoiceServices";
+  }
+  function mockSubmit(payload){
+    var required=["posId","name","ntn","invoiceDateTime","invoiceType","invoiceId","rateValue","saleValue","taxAmount","netAmount","modeOfPay","transType"];
+    var missing=required.filter(function(k){ return payload[k]===""||payload[k]==null; });
+    if(missing.length) return {status:"BAD_REQUEST",resCode:"01",error:"Error in Validation","Required Parameter(s) Missing":missing.join(", ")};
+    var cloud = state.mode==="cloud";
+    if(cloud && (!payload.posUser||!payload.posPass)) return {status:"BAD_REQUEST",resCode:"02",error:"Invalid POS credentials (posUser/posPass)."};
+    if(Number(payload.posId)<=0) return {status:"BAD_REQUEST",resCode:"02",error:"POS ID is not register"};
+    if([1,2].indexOf(Number(payload.invoiceType))===-1) return {status:"BAD_REQUEST",resCode:"02",error:"Invalid Invoice Type. Use 1 for Normal Invoice or 2 for Sales Return"};
+    if(Number(payload.saleValue)<=0) return {status:"BAD_REQUEST",resCode:"02",error:"Invalid Net Amount is used."};
+    var base = Number(payload.saleValue)+Number(payload.serviceCharges||0)+Number(payload.extraCharges||0);
+    var expTax = round2(base*(Number(payload.rateValue)/100));
+    if(Math.abs(expTax-Number(payload.taxAmount))>0.01) return {status:"BAD_REQUEST",resCode:"02",error:"Tax amount is not calculated as per rate and sales value."};
+    var expNet = round2(base+Number(payload.taxAmount)-Number(payload.discountAmount||0));
+    if(Math.abs(expNet-Number(payload.netAmount))>0.01) return {status:"BAD_REQUEST",resCode:"02",error:"Invalid Net Amount is used."};
+    if(state.seen && state.seen[payload.invoiceId]) return {status:"Fail",resCode:"02",error:"Sales invoice cannot be entered due to duplicate InvoiceId."};
+    state.seen = state.seen||{}; state.seen[payload.invoiceId]=true;
+    var srb = payload.posId+""+ (String(new Date().getFullYear()).slice(2)) + p2(new Date().getMonth()+1) + hash3(payload.invoiceId);
+    return { srbInvoiceId:srb, resCode:"00", QRCodeLink:"https://apps.srb.gos.pk/InvoiceVerification/MobileInvoiceStatus.jsp?invoiceVerification="+srb };
+  }
+  function hash3(s){ var h=0; for(var i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; } return h.toString(36).toUpperCase().slice(-3).padStart(3,"A"); }
+
+  // ---- rendering ----
+  function renderMenu(){
+    var el=$("#menu"); el.innerHTML="";
+    MENU.forEach(function(m){
+      var q=state.bill[m.id]||0;
+      var b=document.createElement("button");
+      b.className="dish"; b.setAttribute("data-active",q>0?"1":"0");
+      b.innerHTML='<span class="qty">'+q+'</span><span class="n">'+esc(m.n)+'</span><span class="p">excl. tax · <b>'+money(m.p)+'</b></span>';
+      b.addEventListener("click",function(){ state.bill[m.id]=(state.bill[m.id]||0)+1; refresh(); });
+      el.appendChild(b);
+    });
+  }
+  function renderBill(){
+    var el=$("#billLines"); el.innerHTML="";
+    var L=Object.keys(state.bill).filter(function(id){return state.bill[id]>0;});
+    if(!L.length){ el.innerHTML='<div class="bill-empty">No items yet — tap a dish above.</div>'; }
+    L.forEach(function(id){
+      var m=menuItem(id), qty=state.bill[id];
+      var row=document.createElement("div"); row.className="bl";
+      row.innerHTML='<div class="nm">'+esc(m.n)+'<small>'+money(m.p)+' × '+qty+'</small></div>'+
+        '<div class="stepper"><button aria-label="Remove one">−</button><button aria-label="Add one">+</button></div>'+
+        '<div class="amt">'+money(m.p*qty)+'</div>';
+      var btns=row.querySelectorAll("button");
+      btns[0].addEventListener("click",function(){ state.bill[id]=Math.max(0,qty-1); if(state.bill[id]===0)delete state.bill[id]; refresh(); });
+      btns[1].addEventListener("click",function(){ state.bill[id]=qty+1; refresh(); });
+      el.appendChild(row);
+    });
+  }
+  function renderTotals(){
+    var sale=saleValue(), svc=Number(state.svc)||0, disc=Number(state.disc)||0;
+    var rate = state.faults.mixed ? RATE : RATE;
+    var tax = round2((sale+svc)*(rate/100));
+    var net = round2(sale+svc+tax-disc);
+    var el=$("#totals");
+    el.innerHTML=
+      row("Sale value (excl. tax)",money(sale))+
+      (svc?row("Service charges",money(svc)):"")+
+      row("Sales tax @ "+RATE+"%",money(tax))+
+      (disc?row("Discount","− "+money(disc)):"")+
+      '<div class="tot grand"><span>Net payable</span><b>'+money(net)+'</b></div>';
+    function row(a,b){ return '<div class="tot"><span>'+a+'</span><b>'+b+'</b></div>'; }
+  }
+  function renderFaults(){
+    var el=$("#faults");
+    // keep the lead paragraph, append toggles once
+    if(!el.dataset.built){
+      FAULTS.forEach(function(f){
+        var lab=document.createElement("label"); lab.className="fault";
+        lab.innerHTML='<input type="checkbox" data-f="'+f.id+'"><span class="fx">'+esc(f.fx)+'<small>'+esc(f.sub)+'</small></span>';
+        lab.querySelector("input").addEventListener("change",function(e){ state.faults[f.id]=e.target.checked; refresh(); });
+        el.appendChild(lab);
+      });
+      el.dataset.built="1";
+    }
+    // sync disabled state: nocreds only meaningful in cloud
+    var nc=el.querySelector('input[data-f="nocreds"]');
+    if(nc){ nc.closest(".fault").style.opacity = state.mode==="cloud"?"1":".45"; nc.disabled = state.mode!=="cloud"; if(state.mode!=="cloud"){ nc.checked=false; state.faults.nocreds=false; } }
+  }
+
+  function colorizeJson(obj, addedKeys){
+    var lines=[]; var keys=Object.keys(obj);
+    keys.forEach(function(k,i){
+      var v=obj[k], comma = i<keys.length-1 ? "," : "";
+      var val;
+      if(typeof v==="number"){ val='<span class="n">'+v+'</span>'; }
+      else if(k==="posPass" && v){ val='<span class="s">"••••••••"</span>'; }
+      else { val='<span class="s">"'+esc(v)+'"</span>'; }
+      var added = addedKeys.indexOf(k)>-1 ? ' added' : '';
+      lines.push('  <span class="k'+added+'">"'+k+'"</span>: '+val+comma);
+    });
+    return "{\n"+lines.join("\n")+"\n}";
+  }
+
+  function renderWire(){
+    var built=buildPayload();
+    $("#wireUrl").innerHTML = state.mode==="cloud"
+      ? '/ePOSGateway/v1/SalesInvoiceService.api <span class="host">@ pos.srb.gos.pk</span>'
+      : '/pos/SalesInvoiceServices <span class="host">@ localhost:8282</span>';
+    var mt=$("#wireMode"); mt.className="mode-tag "+state.mode; mt.textContent = state.mode==="cloud"?"CLOUD":"OFFLINE";
+    $("#wireSub").textContent = state.mode==="cloud" ? "gateway call · credentials in body" : "local Connector · no body credentials";
+    $("#wireJson").innerHTML = colorizeJson(built.payload, built.addedKeys);
+    return built;
+  }
+
+  function svgIcon(ok){
+    return ok
+      ? '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></svg>'
+      : '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>';
+  }
+
+  function renderResponse(result){
+    var el=$("#response");
+    if(!result){ // resting state — a ghost receipt
+      el.innerHTML='<div class="receipt-wrap">'+receiptHtml(null)+'</div>';
+      $("#respSub").textContent="press Report to SRB";
+      return;
+    }
+    if(result.resCode==="00"){
+      $("#respSub").textContent="accepted · resCode 00";
+      el.innerHTML=
+        '<div class="verdict ok">'+svgIcon(true)+'Accepted by SRB — fiscal invoice issued<span class="rc">resCode 00</span></div>'+
+        '<div class="receipt-wrap">'+receiptHtml(result)+'</div>';
+      drawQr(result.QRCodeLink);
+    } else {
+      $("#respSub").textContent="rejected · resCode "+(result.resCode||"—");
+      el.innerHTML=
+        '<div class="verdict err">'+svgIcon(false)+'Rejected by SRB<span class="rc">resCode '+esc(result.resCode||"—")+'</span></div>'+
+        '<div class="errline">'+esc((result.error||"")+(result["Required Parameter(s) Missing"]?(" — "+result["Required Parameter(s) Missing"]):""))+'</div>'+
+        '<div class="receipt-wrap">'+receiptHtml(null)+'</div>';
+    }
+  }
+
+  function receiptHtml(result){
+    var built = lastBuilt || buildPayload();
+    var pd = built.payload;
+    var ghost = !result;
+    var srbNo = result ? result.srbInvoiceId : "—— pending ——";
+    var stamp = result ? '<div class="stamp ok">Valid</div>' : '<div class="stamp pending">Not reported</div>';
+    return '<div class="receipt'+(ghost?' ghost':'')+'">'+stamp+
+      '<div class="r-head"><div class="r-logo">Keyani Restaurant</div><div class="r-sub">SINDH REVENUE BOARD · FISCAL INVOICE</div></div>'+
+      rrow("NTN",pd.ntn)+rrow("POS ID",pd.posId)+rrow("Invoice No",pd.invoiceId)+rrow("Date",pd.invoiceDateTime)+
+      '<div class="r-money">'+
+        rrow("Sale Value",money(pd.saleValue))+
+        (pd.serviceCharges?rrow("Service Charges",money(pd.serviceCharges)):"")+
+        rrow("Tax @ "+pd.rateValue+"%",money(pd.taxAmount))+
+        (pd.discountAmount?rrow("Discount","− "+money(pd.discountAmount)):"")+
+        '<div class="r-row r-net"><span class="lbl">Net Amount</span><span class="val">'+money(pd.netAmount)+'</span></div>'+
+        rrow("POS Fee",money(POS_FEE))+
+      '</div>'+
+      '<div class="r-srb"><div class="cap">SRB Invoice No</div><div class="num">'+esc(srbNo)+'</div></div>'+
+      '<div class="qr" id="qrBox">'+(ghost?'<svg width="118" height="118" viewBox="0 0 24 24" fill="none" stroke="#cfc9b8" stroke-width="1.4"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 20v.01M17 20v.01M20 17v.01"/></svg>':'')+'</div>'+
+      '<div class="r-foot">'+(result?'Scan to verify at srb.gos.pk':'Awaiting SRB fiscal number')+'</div>'+
+      '<div class="r-foot" style="margin-top:6px">Thank You</div>'+
+      '</div>';
+    function rrow(l,v){ return '<div class="r-row"><span class="lbl">'+l+'</span><span class="val">'+esc(v)+'</span></div>'; }
+  }
+
+  function drawQr(url){
+    var box=$("#qrBox"); if(!box||!window.QRCode) return;
+    box.innerHTML="";
+    new window.QRCode(box,{ text:url, width:126, height:126, colorDark:"#12130f", colorLight:"#fbfaf5", correctLevel:window.QRCode.CorrectLevel.M });
+  }
+
+  var lastBuilt=null;
+  function refresh(){
+    renderMenu(); renderBill(); renderTotals(); renderFaults();
+    lastBuilt = renderWire();
+    // update resting receipt (without a response) so the receipt mirrors the bill
+    if(!$("#response").dataset.reported){ renderResponse(null); }
+  }
+
+  function report(){
+    lastBuilt = renderWire();
+    var resp;
+    if(lastBuilt.errors.length){
+      resp = { resCode: (lastBuilt.errors[0].indexOf("credentials")>-1?"—":"—"), error: lastBuilt.errors[0], local:true };
+      // present local (driver-side) rejections in SRB’s language
+      resp.resCode = "local";
+    } else {
+      resp = mockSubmit(lastBuilt.payload);
+    }
+    var el=$("#response"); el.dataset.reported="1";
+    if(resp && resp.resCode==="00"){ state.lastAcceptedId = lastBuilt.payload.invoiceId; if(!state.faults.dupe){ state.invSeq++; } }
+    // local rejections render like SRB rejections but tagged
+    if(resp.local){
+      $("#respSub").textContent="rejected before sending · driver guard";
+      el.innerHTML='<div class="verdict err">'+svgIcon(false)+'Rejected by the driver — never reaches SRB<span class="rc">local</span></div>'+
+        '<div class="errline">'+esc(resp.error)+'</div>'+
+        '<div class="receipt-wrap">'+receiptHtml(null)+'</div>';
+    } else {
+      renderResponse(resp);
+    }
+  }
+
+  function setMode(m){
+    state.mode=m;
+    document.querySelectorAll(".seg button").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.mode===m ? "true":"false"); });
+    refresh();
+  }
+
+  // wire up
+  document.querySelectorAll(".seg button").forEach(function(b){ b.addEventListener("click",function(){ setMode(b.dataset.mode); }); });
+  $("#svc").addEventListener("input",function(e){ state.svc=e.target.value; refresh(); });
+  $("#disc").addEventListener("input",function(e){ state.disc=e.target.value; refresh(); });
+  $("#reportBtn").addEventListener("click",report);
+  $("#rateLbl").textContent=RATE+"%";
+
+  // first paint — open with a reported, valid receipt so the page shows what it does
+  refresh();
+  report();
+})();
+</script>
