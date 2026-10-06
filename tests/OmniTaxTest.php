@@ -5,6 +5,8 @@ namespace Nosh\OmniTax\Tests;
 use Illuminate\Support\Facades\Event;
 use Nosh\OmniTax\Builders\InvoiceBuilder;
 use Nosh\OmniTax\Builders\LineItemBuilder;
+use Nosh\OmniTax\Data\Credentials;
+use Nosh\OmniTax\Data\Seller;
 use Nosh\OmniTax\Events\InvoiceAccepted;
 use Nosh\OmniTax\Facades\OmniTax;
 use Nosh\OmniTax\Models\FiscalInvoice;
@@ -64,9 +66,44 @@ class OmniTaxTest extends TestCase
         $this->assertSame(FiscalInvoice::PENDING, $a->status);
     }
 
-    public function test_provincial_authority_not_yet_available(): void
+    /** PRA and SRB ship now; with a registered POS each returns a fiscal number from the mock. */
+    public function test_pra_and_srb_submit_through_the_mock_authority(): void
+    {
+        $credentials = [
+            'pra' => ['token' => 'test-token', 'posId' => '1234'],
+            'srb' => ['posId' => '1234', 'posUser' => 'pos', 'posPass' => 'secret'],
+        ];
+
+        // The suite binds the FBR mock for everything; drop it so each
+        // authority gets its own mock (transport = mock in config).
+        $this->app->offsetUnset(\Nosh\OmniTax\Contracts\Transport::class);
+
+        foreach ($credentials as $authority => $creds) {
+            OmniTax::resolveCredentialsUsing(fn () => new Credentials(...$creds + [
+                'authority' => $authority, 'sandbox' => true, 'mode' => 'cloud',
+                'seller' => new Seller('1234567', 'Test Restaurant', 'Punjab', 'Lahore'),
+            ]));
+
+            $response = OmniTax::authority($authority)->submit($this->restaurantInvoice());
+
+            $this->assertTrue($response->isValid(), "{$authority} accepted: ".json_encode($response->errors()));
+            $this->assertNotNull($response->invoiceNumber(), "{$authority} fiscal number");
+        }
+    }
+
+    /** Without a registered POS the provincial drivers refuse rather than guess. */
+    public function test_pra_without_a_pos_id_is_refused(): void
+    {
+        $response = OmniTax::authority('pra')->submit($this->restaurantInvoice());
+
+        $this->assertFalse($response->isValid());
+        $this->assertStringContainsString('POS ID', implode(' ', $response->errors()));
+    }
+
+    /** An authority whose driver has not shipped still refuses clearly. */
+    public function test_an_authority_still_rolling_out_is_refused(): void
     {
         $this->expectExceptionMessageMatches('/rolling out|not yet available/i');
-        OmniTax::authority('pra')->submit($this->restaurantInvoice());
+        OmniTax::authority('kpra')->submit($this->restaurantInvoice());
     }
 }
