@@ -70,6 +70,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Real-time reporting (OmniTax::report)
+    |--------------------------------------------------------------------------
+    | report() first tries the authority INLINE, so the fiscal number can go on
+    | the receipt being printed — but never for longer than `timeout` seconds.
+    | If the authority is slow or down, the sale is queued instead and the
+    | caller carries on; a rejection is never queued (it would be refused
+    | again). Set enabled = false to always queue.
+    */
+    'realtime' => [
+        'enabled' => (bool) env('FISCAL_REALTIME', true),
+        'timeout' => (float) env('FISCAL_REALTIME_TIMEOUT', 3),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP transport
+    |--------------------------------------------------------------------------
+    | force_ipv4      Authorities that whitelist your server's IP (PRA cloud)
+    |                 know its IPv4. A dual-stack server may otherwise go out
+    |                 over IPv6 and be refused as an unknown address.
+    | connect_timeout Seconds to wait for the connection itself (null = only
+    |                 the overall timeout applies).
+    */
+    'http' => [
+        'force_ipv4'      => (bool) env('FISCAL_FORCE_IPV4', false),
+        'connect_timeout' => env('FISCAL_CONNECT_TIMEOUT') !== null ? (float) env('FISCAL_CONNECT_TIMEOUT') : null,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | QR code
     |--------------------------------------------------------------------------
     */

@@ -5,6 +5,7 @@ namespace Nosh\OmniTax\Drivers;
 use Nosh\OmniTax\Data\Invoice;
 use Nosh\OmniTax\Data\LineItem;
 use Nosh\OmniTax\Responses\FiscalResponse;
+use Nosh\OmniTax\Support\Feature;
 
 /**
  * SRB (Sindh Revenue Board) POS driver.
@@ -34,6 +35,12 @@ class SrbDriver extends AbstractDriver
 {
     public const MODE_CLOUD = 'cloud';
     public const MODE_OFFLINE = 'offline';
+
+    /** invoiceType 2 (sales return); POS Connector on the till. */
+    protected function features(): array
+    {
+        return [Feature::CREDIT_NOTE, Feature::OFFLINE_MODE];
+    }
 
     public function key(): string
     {
@@ -81,9 +88,7 @@ class SrbDriver extends AbstractDriver
             );
         }
 
-        $result = $this->transport->post($this->endpoint(), $payload, $this->headers());
-
-        return $this->parse($result['status'] ?? 0, $result['body'] ?? []);
+        return $this->send($this->endpoint(), $payload);
     }
 
     /** SRB publishes no server-to-server reference lists. */

@@ -72,6 +72,17 @@ class FiscalResponse
         return $this->httpStatus;
     }
 
+    /**
+     * Worth trying again unchanged? True when the authority was never reached
+     * (status 0 — network, timeout) or failed on its side (5xx). A business
+     * rejection (4xx, or a 200 carrying an error code) is not: the same
+     * payload will be refused again.
+     */
+    public function isRetryable(): bool
+    {
+        return ! $this->valid && ($this->httpStatus === 0 || $this->httpStatus >= 500);
+    }
+
     /** The exact string a driver wants encoded in the QR, when it differs from the
      *  fiscal number (SRB encodes the verification URL; FBR encodes the number). */
     public function qrPayload(): ?string

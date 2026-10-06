@@ -90,6 +90,26 @@ class InvoiceBuilder
         return $this;
     }
 
+    /**
+     * Make this a credit note (refund / sales return) against an earlier sale.
+     *
+     * `$originalNumber` is YOUR number for the original sale (PRA `RefUSIN`);
+     * `$originalFiscalNumber` is the number the authority issued for it, kept
+     * as the invoice reference. Give the credit note its own `->number()` too —
+     * it is a new document, not a resubmission of the old one.
+     *
+     * Not every authority accepts one: check `supports(Feature::CREDIT_NOTE)`
+     * (FBR Digital Invoicing has no credit note). An unsupported authority
+     * answers with a clear rejection rather than a silent no-op.
+     */
+    public function creditNoteFor(string $originalNumber, ?string $originalFiscalNumber = null): self
+    {
+        $this->invoice->type = 'Credit Note';
+        $this->invoice->invoiceRefNo = $originalFiscalNumber ?? $originalNumber;
+
+        return $this->meta(['refUsin' => $originalNumber]);
+    }
+
     public function idempotencyKey(string $key): self
     {
         $this->invoice->idempotencyKey = $key;
