@@ -66,12 +66,13 @@ class OmniTaxTest extends TestCase
         $this->assertSame(FiscalInvoice::PENDING, $a->status);
     }
 
-    /** PRA and SRB ship now; with a registered POS each returns a fiscal number from the mock. */
+    /** PRA, SRB and KPRA ship now; with a registered POS each returns a fiscal number from the mock. */
     public function test_pra_and_srb_submit_through_the_mock_authority(): void
     {
         $credentials = [
-            'pra' => ['token' => 'test-token', 'posId' => '1234'],
-            'srb' => ['posId' => '1234', 'posUser' => 'pos', 'posPass' => 'secret'],
+            'pra'  => ['token' => 'test-token', 'posId' => '1234'],
+            'srb'  => ['posId' => '1234', 'posUser' => 'pos', 'posPass' => 'secret'],
+            'kpra' => ['posId' => 'K123456', 'apiKey' => 'KPRA@123a'],
         ];
 
         // The suite binds the FBR mock for everything; drop it so each
@@ -100,10 +101,10 @@ class OmniTaxTest extends TestCase
         $this->assertStringContainsString('POS ID', implode(' ', $response->errors()));
     }
 
-    /** An authority whose driver has not shipped still refuses clearly. */
+    /** An authority whose driver has not shipped still refuses clearly (BRA is planned). */
     public function test_an_authority_still_rolling_out_is_refused(): void
     {
         $this->expectExceptionMessageMatches('/rolling out|not yet available/i');
-        OmniTax::authority('kpra')->submit($this->restaurantInvoice());
+        OmniTax::authority('bra')->submit($this->restaurantInvoice());
     }
 }
