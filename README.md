@@ -64,7 +64,7 @@ You never touch a government API directly, and you never rewrite your billing co
 | **FBR** (Federal, via PRAL) | Islamabad / ICT + goods | Services (ICT), goods | ✅ Available |
 | **SRB** — Sindh Revenue Board | Sindh | Restaurant / services | ✅ Available (cloud + offline) |
 | **PRA** — Punjab Revenue Authority | Punjab | Restaurant / services | ✅ Available (cloud + offline) |
-| **KPRA** — KP Revenue Authority | Khyber Pakhtunkhwa | Restaurant / services | 🚧 Rolling out |
+| **KPRA** — KP Revenue Authority | Khyber Pakhtunkhwa | Restaurant / services | ✅ Available (cloud + offline) |
 | **BRA** — Balochistan Revenue Authority | Balochistan | Restaurant / services | 🗓️ Planned |
 | **International** (ZATCA, MyInvois, …) | Global | Any | 🧭 By design — see §20 |
 
@@ -130,6 +130,38 @@ if ($response->isValid()) {
 - **Note on offline:** PRA's offline component is a Windows/.NET service the merchant installs; the package **talks to** it on `localhost:8524` (it doesn't ship or install it) — the same division of labour as SRB's Connector.
 
 As always, `FISCAL_TRANSPORT=mock` runs the whole PRA flow — both modes — with **no token, no IP whitelisting and no network**.
+
+### 2c. KPRA (KP Revenue Authority) — cloud & offline
+
+KPRA fiscalises each sale through its **RIMS** (Restaurant Invoice Monitoring System) and returns a **KPRA transaction ID** plus a QR that encodes KPRA's verification URL. Like SRB and PRA, KPRA offers two integration modes, and the package supports **both from the same code** — same canonical invoice, only the deployment's mode differs:
+
+| Mode | For | How it connects | Auth |
+|---|---|---|---|
+| **`cloud`** | Your **online / website** deployment | Posts each sale to KPRA's live API: `POST https://kpra.gov.pk/api/rims-integration` | `ntn` + `pos_id` + `key` in the body (HTTPS required) |
+| **`offline`** | Your **desktop app** | Posts to the locally-installed **KPRA RIMS utility**: `POST http://localhost:3000/api/invoice` — the utility queues while offline and syncs to KPRA when the connection returns | Same `ntn` + `pos_id` + `key` in the body |
+
+Pick the mode per deployment (`FISCAL_KPRA_MODE=cloud|offline`, or the `mode` column per tenant).
+
+```php
+use Nosh\OmniTax\Facades\OmniTax;
+
+$response = OmniTax::authority('kpra')->submit($invoice);
+
+if ($response->isValid()) {
+    $kpraId = $response->invoiceNumber();   // KPRA's transaction id, e.g. "8843481"
+    $qr     = $response->qr();               // encodes …/api/?pos_id=<posId>&invoice_no=<invoiceNo>
+}
+```
+
+**KPRA specifics** the driver handles (per KPRA's RIMS API docs + OpenAPI spec):
+
+- KPRA works at the **invoice-total level** (like SRB): a single `tax_rate`, a tax-exclusive `amount`, the `tax_amount`, and a tax-inclusive `total_amount`. The driver aggregates your line items and computes `tax_amount = amount × rate/100` and `total_amount = amount + tax_amount`. (KPRA is **one rate per invoice** — a mixed-rate invoice is rejected with a clear error.)
+- **Credentials ride in the body** for both modes — there is no bearer token. Set `FISCAL_KPRA_POS_ID` and `FISCAL_KPRA_KEY` (single-business), or the per-tenant `pos_id` / `api_key` / `mode` columns on `fiscal_credentials` (the key is encrypted at rest). Register the POS and obtain these from the **KPRA POS portal** (`https://posregistration.kpra.gov.pk`).
+- **Your own invoice number** is `invoice_no` (`->number()`, max 50 chars, unique per `pos_id`); `->modeOfPay('Cash'|'Card')` maps to KPRA's `payment_mode` (`1`=cash default, `2`=card); `->at('YYYY-MM-DD HH:MM:SS')` sets `date_time`.
+- Success is **HTTP `201`** (note: FBR/SRB use resCode `"00"`, PRA uses code `"100"`). The QR encodes KPRA's verification URL: `https://kpra.gov.pk/api/?pos_id=<posId>&invoice_no=<invoiceNo>`.
+- **Refunds** are a separate document: a credit note goes to KPRA's dedicated `POST https://kpra.gov.pk/api/kpra-credit-note` with a `credit_note_no`, referencing the original sale by its `invoice_no`. Build it as a `Credit Note` invoice and pass `meta(['creditNoteNo' => 'CN-1001', 'refInvoiceNo' => '<original invoice_no>', 'noteType' => 'full'|'partial', 'reason' => '…'])`. Re-sending the same `credit_note_no` is idempotent (KPRA returns the existing record).
+
+As always, `FISCAL_TRANSPORT=mock` runs the whole KPRA flow — both modes, plus credit notes — with **no POS ID and no network**.
 
 ---
 

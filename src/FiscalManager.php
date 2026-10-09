@@ -27,6 +27,7 @@ use Nosh\OmniTax\Support\Feature;
 use Nosh\OmniTax\Testing\Scenario;
 use Nosh\OmniTax\Support\Qr\Logo;
 use Nosh\OmniTax\Transport\HttpTransport;
+use Nosh\OmniTax\Transport\KpraMockTransport;
 use Nosh\OmniTax\Transport\MockTransport;
 use Nosh\OmniTax\Transport\PraMockTransport;
 use Nosh\OmniTax\Transport\SrbMockTransport;
@@ -344,6 +345,7 @@ class FiscalManager
             return match ($authority ?? $this->authority ?? $this->config['default'] ?? 'fbr') {
                 'srb'   => new SrbMockTransport(),
                 'pra'   => new PraMockTransport(),
+                'kpra'  => new KpraMockTransport(),
                 default => new MockTransport(),
             };
         }
