@@ -214,7 +214,7 @@ echo "\n== 9. Credit note for an unknown invoice -> 404 (not found) ==\n";
 [$cn404] = cloudDriver($kpraConfig);
 $orphan = (new InvoiceBuilder())->type('Credit Note')->date('2026-09-24')
     ->seller('K123456', 'HEAD OFFICE', 'Khyber Pakhtunkhwa', 'Peshawar')->walkInCustomer()
-    ->meta(['creditNoteNo' => 'CN-X', 'refInvoiceNo' => 'DOES-NOT-EXIST'])
+    ->meta(['creditNoteNo' => 'CN-X', 'refInvoiceNo' => KpraMockTransport::UNKNOWN_INVOICE])
     ->addItem((new LineItemBuilder())->description('Platter')->quantity(1)->unitPrice(1000)->taxRate('10%')->saleType('Services'))
     ->build();
 $orphanRes = $cn404->submit($orphan);

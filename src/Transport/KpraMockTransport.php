@@ -10,7 +10,7 @@ use Nosh\OmniTax\Contracts\Transport;
  * pos_id, date_time}}` on success, and the documented 400/401/404 error bodies
  * on failure — and runs the same validations KPRA documents (required fields,
  * credentials, amount/rate rules, date format, invoice_no uniqueness per pos_id,
- * credit-note lookup). The whole flow is testable with NO POS ID and NO network,
+ * credit-note lookup — see UNKNOWN_INVOICE). The whole flow is testable with NO POS ID and NO network,
  * for both the live API (cloud) and the local RIMS utility (offline).
  *
  * Flip transport back to 'http' and the identical KpraDriver talks to the real
@@ -18,6 +18,9 @@ use Nosh\OmniTax\Contracts\Transport;
  */
 class KpraMockTransport implements Transport
 {
+    /** A credit note against this original `invoice_no` gets KPRA's 404. */
+    public const UNKNOWN_INVOICE = 'NOT-FOUND';
+
     /** @var array<int,array{url:string,payload:array}> */
     public array $recorded = [];
 
@@ -104,9 +107,13 @@ class KpraMockTransport implements Transport
             return $this->error(401, 'Invalid POS ID or key.');
         }
 
-        // The original sale must have been recorded for this pos_id.
-        $invoiceKey = $payload['pos_id'].'|'.$payload['invoice_no'];
-        if (! isset($this->seenInvoices[$invoiceKey])) {
+        // KPRA answers 404 when the original sale is unknown. A mock cannot see
+        // what the real register holds, and a host builds a new transport per
+        // call (a refund arrives in another request, often another process, than
+        // its sale), so "never seen by THIS object" proves nothing. The mock
+        // therefore accepts any original except the sentinel below, which lets
+        // a test exercise the 404 path deliberately.
+        if ((string) $payload['invoice_no'] === self::UNKNOWN_INVOICE) {
             return $this->error(404, 'Original invoice not found for this branch.');
         }
 

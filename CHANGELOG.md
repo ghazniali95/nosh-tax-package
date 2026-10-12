@@ -6,6 +6,7 @@ All notable changes to `nosh/omnitax`. Versions follow [Semantic Versioning](htt
 
 ### Fixed
 - **KPRA credit notes could not find their sale.** `creditNoteFor($ourNumber, $authorityNumber)` keeps our number in meta `refUsin`; the KPRA driver read only `invoiceRefNo` (the authority's transaction id), so KPRA answered 404. It now sends `refUsin` as the original `invoice_no`.
+- **The KPRA mock refused every refund made in a later request.** It only knew sales sent through the same PHP object, so a host (a new transport per call) got "Original invoice not found" for every credit note. It now accepts any original except `KpraMockTransport::UNKNOWN_INVOICE` (`NOT-FOUND`), which still answers KPRA's 404.
 - **KPRA tax was recomputed from the rate.** `tax_amount` is now the invoice's `totalTax()`, so lines that state the tax the customer was charged are reported exactly. Lines without an explicit tax are unchanged.
 
 ## v1.3.0 — 2026-10-09
