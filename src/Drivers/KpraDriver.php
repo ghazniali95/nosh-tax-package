@@ -190,8 +190,13 @@ class KpraDriver extends AbstractDriver
         $rateValue = $rates ? round(reset($rates) * 100, 4) : 0.0;
 
         // --- Amounts (tax-exclusive amount, tax, tax-inclusive total) -----
+        // The tax is the lines' own: a host that states each line's tax (what
+        // the customer was actually charged) must not see KPRA told a figure
+        // recomputed from the rate, which can round differently. Lines with no
+        // explicit tax fall back to value × rate, so the result is the same as
+        // before for them.
         $amount = round($invoice->subtotalExcludingTax(), 2);        // tax-exclusive
-        $taxAmount = round($amount * ($rateValue / 100), 2);
+        $taxAmount = round($invoice->totalTax(), 2);
         $totalAmount = round($amount + $taxAmount, 2);
 
         if ($amount <= 0) {
@@ -209,7 +214,10 @@ class KpraDriver extends AbstractDriver
         // --- Credit note (refund) → the dedicated endpoint's shape --------
         if ($invoice->isCreditNote()) {
             $creditNoteNo = (string) ($meta['creditNoteNo'] ?? $meta['credit_note_no'] ?? $invoiceNo);
-            $originalNo = (string) ($meta['refInvoiceNo'] ?? $meta['originalInvoiceNo'] ?? $invoice->invoiceRefNo);
+            // KPRA finds the original by OUR invoice_no. creditNoteFor() keeps
+            // that in meta `refUsin` and puts the authority's own number (the
+            // KPRA transaction id) in invoiceRefNo, which KPRA cannot look up.
+            $originalNo = (string) ($meta['refInvoiceNo'] ?? $meta['originalInvoiceNo'] ?? $meta['refUsin'] ?? $invoice->invoiceRefNo);
 
             if ($originalNo === '') {
                 $errors[] = 'A KPRA credit note needs the original sale\'s invoice_no (set meta[refInvoiceNo]).';

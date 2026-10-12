@@ -187,6 +187,29 @@ check('credit note recorded (valid)', $cnRes->isValid());
 check('credit note hit the credit-note endpoint', str_contains($cnMock->recorded[1]['url'], 'kpra-credit-note'));
 check('re-sending same credit_note_no still valid (idempotent 200)', $cnDriver->submit($makeCn())->isValid());
 
+echo "\n== 8b. creditNoteFor(): the original is found by OUR number, not KPRA's id ==\n";
+[$cfDriver] = cloudDriver($kpraConfig);
+$cf = (new InvoiceBuilder())->date('2026-09-24')->at('2026-09-24 17:00:00')
+    ->seller('K123456', 'HEAD OFFICE', 'Khyber Pakhtunkhwa', 'Peshawar')->walkInCustomer()
+    ->number('ORD-900-R1')
+    ->creditNoteFor('ORD-900', 'KPRA-TXN-555')   // our number, KPRA's transaction id
+    ->addItem((new LineItemBuilder())->description('Refund')->quantity(1)->unitPrice(1000)->taxRate('10%')->saleType('Services'))
+    ->build();
+[$cfPayload] = $cfDriver->buildPayload($cf);
+check('credit note invoice_no is our original number', ($cfPayload['invoice_no'] ?? null) === 'ORD-900');
+check('credit_note_no defaults to the note\'s own number', ($cfPayload['credit_note_no'] ?? null) === 'ORD-900-R1');
+
+echo "\n== 8c. An explicit line tax is reported as charged, not recomputed ==\n";
+[$txDriver] = cloudDriver($kpraConfig);
+$charged = (new InvoiceBuilder())->type('Sale Invoice')->date('2026-09-24')->at('2026-09-24 12:00:00')
+    ->seller('K123456', 'HEAD OFFICE', 'Khyber Pakhtunkhwa', 'Peshawar')->walkInCustomer()->number('ORD-TX')
+    ->addItem((new LineItemBuilder())->description('Karahi')->quantity(1)->unitPrice(1000.33)->taxRate('16%')->taxAmount(160.00)->saleType('Services'))
+    ->addItem((new LineItemBuilder())->description('Naan')->quantity(3)->unitPrice(33.33)->taxRate('16%')->taxAmount(16.00)->saleType('Services'))
+    ->build();
+[$txPayload] = $txDriver->buildPayload($charged);
+check('tax_amount = the lines\' own tax (176.00)', (float) $txPayload['tax_amount'] === 176.0);
+check('total_amount = amount + that tax', (float) $txPayload['total_amount'] === round((float) $txPayload['amount'] + 176.0, 2));
+
 echo "\n== 9. Credit note for an unknown invoice -> 404 (not found) ==\n";
 [$cn404] = cloudDriver($kpraConfig);
 $orphan = (new InvoiceBuilder())->type('Credit Note')->date('2026-09-24')
