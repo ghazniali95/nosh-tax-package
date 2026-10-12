@@ -2,6 +2,17 @@
 
 All notable changes to `nosh/omnitax`. Versions follow [Semantic Versioning](https://semver.org).
 
+## v1.3.1 — 2026-10-13
+
+### Fixed
+- **KPRA credit notes could not find their sale.** `creditNoteFor($ourNumber, $authorityNumber)` keeps our number in meta `refUsin`; the KPRA driver read only `invoiceRefNo` (the authority's transaction id), so KPRA answered 404. It now sends `refUsin` as the original `invoice_no`.
+- **KPRA tax was recomputed from the rate.** `tax_amount` is now the invoice's `totalTax()`, so lines that state the tax the customer was charged are reported exactly. Lines without an explicit tax are unchanged.
+
+## v1.3.0 — 2026-10-09
+
+### Added
+- **KPRA** (Khyber Pakhtunkhwa Revenue Authority) driver, cloud + offline, with credit notes and an in-package mock transport. New encrypted `fiscal_credentials.api_key` column (KPRA's body `key`), `FISCAL_KPRA_KEY` / `FISCAL_KPRA_POS_ID` / `FISCAL_KPRA_MODE`.
+
 ## v1.2.0 — 2026-10-06
 
 Real-time reporting with a queued fallback, plus fixes that matter in production.
