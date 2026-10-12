@@ -9,10 +9,11 @@ namespace Nosh\OmniTax\Data;
 class Credentials
 {
     /**
-     * @param ?string $posId    SRB-only: the registered POS ID.
+     * @param ?string $posId    SRB/KPRA: the registered POS ID.
      * @param ?string $posUser  SRB cloud-only: gateway username (sent in the body).
      * @param ?string $posPass  SRB cloud-only: gateway password (sent in the body).
-     * @param ?string $mode     SRB-only: 'cloud' (website) or 'offline' (desktop connector).
+     * @param ?string $mode     SRB/KPRA: 'cloud' (website) or 'offline' (desktop utility/connector).
+     * @param ?string $apiKey   KPRA-only: the secret "key" sent with pos_id in the request body.
      */
     public function __construct(
         public string $authority,
@@ -24,6 +25,7 @@ class Credentials
         public ?string $posUser = null,
         public ?string $posPass = null,
         public ?string $mode = null,
+        public ?string $apiKey = null,
     ) {
     }
 
@@ -44,6 +46,7 @@ class Credentials
             posUser: $d['pos_user'] ?? $d['posUser'] ?? null,
             posPass: $d['pos_pass'] ?? $d['posPass'] ?? null,
             mode: $d['mode'] ?? null,
+            apiKey: $d['api_key'] ?? $d['apiKey'] ?? $d['key'] ?? null,
         );
     }
 }

@@ -18,7 +18,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?string $pos_id    SRB registered POS ID
  * @property ?string $pos_user  SRB cloud username (encrypted at rest)
  * @property ?string $pos_pass  SRB cloud password (encrypted at rest)
- * @property ?string $mode      SRB mode: 'cloud' | 'offline'
+ * @property ?string $mode      SRB/KPRA mode: 'cloud' | 'offline'
+ * @property ?string $api_key   KPRA body "key" (encrypted at rest)
  */
 class FiscalCredential extends Model
 {
@@ -31,7 +32,8 @@ class FiscalCredential extends Model
         'token'    => 'encrypted', // encrypted at rest
         'pos_user' => 'encrypted', // SRB cloud credential
         'pos_pass' => 'encrypted', // SRB cloud credential
+        'api_key'  => 'encrypted', // KPRA body "key"
     ];
 
-    protected $hidden = ['token', 'pos_user', 'pos_pass'];
+    protected $hidden = ['token', 'pos_user', 'pos_pass', 'api_key'];
 }

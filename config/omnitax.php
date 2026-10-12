@@ -197,9 +197,24 @@ return [
         ],
         'kpra' => [
             'label'  => 'KP Revenue Authority',
-            'driver' => null, // 🚧 rolling out
-            'token'  => env('FISCAL_KPRA_TOKEN'),
-            'urls'   => [],
+            'driver' => \Nosh\OmniTax\Drivers\KpraDriver::class, // ✅ available
+            // KPRA authenticates per-request with pos_id + key carried IN THE BODY
+            // (no bearer token), so `token` is unused here.
+            'token'  => null,
+            'key'    => env('FISCAL_KPRA_KEY'),       // the secret "key" issued with your POS ID
+            // Integration mode: 'cloud' for an online/website deployment (posts each
+            // sale straight to KPRA's live RIMS API), or 'offline' for the desktop
+            // app (posts to the local KPRA RIMS utility on localhost:3000, which
+            // queues while offline and syncs to KPRA). The identical driver serves both.
+            'mode'   => env('FISCAL_KPRA_MODE', 'cloud'),
+            'pos_id' => env('FISCAL_KPRA_POS_ID'),
+            'urls'   => [
+                'cloud'       => env('FISCAL_KPRA_CLOUD_URL', 'https://kpra.gov.pk/api/rims-integration'),
+                'offline'     => env('FISCAL_KPRA_OFFLINE_URL', 'http://localhost:3000/api/invoice'),
+                'credit_note' => env('FISCAL_KPRA_CREDIT_NOTE_URL', 'https://kpra.gov.pk/api/kpra-credit-note'),
+                // Base for the receipt QR: …/api/?pos_id=<posId>&invoice_no=<invoiceNo>
+                'verify'      => env('FISCAL_KPRA_VERIFY_URL', 'https://kpra.gov.pk/api/'),
+            ],
         ],
         'bra' => [
             'label'  => 'Balochistan Revenue Authority',

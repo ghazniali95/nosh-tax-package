@@ -45,11 +45,12 @@ class DatabaseCredentialResolver implements CredentialResolver
                 $row->seller_address,
             ),
             tenantId: $tenantId,
-            // SRB-specific per-tenant fields (nullable; absent for FBR rows).
+            // SRB/KPRA per-tenant fields (nullable; absent for FBR rows).
             posId: isset($row->pos_id) ? (string) $row->pos_id : null,
             posUser: $row->pos_user ?? null,
             posPass: $row->pos_pass ?? null,
             mode: $row->mode ?? null,
+            apiKey: $row->api_key ?? null,   // KPRA body "key" (encrypted at rest)
         );
     }
 
