@@ -279,6 +279,18 @@ class KpraDriver extends AbstractDriver
             ? in_array($httpStatus, [200, 201], true) && ! empty($data['credit_note_id'])
             : $httpStatus === 201 && ! empty($data['transaction_id']);
 
+        // KPRA keeps one invoice per invoice_no per POS ID and answers a second
+        // send of the same sale with 400 "Invoice already exists". That means an
+        // earlier send got there: usually the first, real-time one, whose answer
+        // came after we stopped waiting, so we sent it again. The sale IS at
+        // KPRA, so it is reported, not failed. KPRA does not repeat the
+        // transaction id here, so there is no fiscal number or QR to keep.
+        // (Sales only: a credit note's "already recorded" is the 200 above.)
+        $alreadyThere = ! $isCreditNote && ! $valid && $httpStatus === 400 && $this->saysAlreadyExists($body);
+        if ($alreadyThere) {
+            $valid = true;
+        }
+
         $invoiceNumber = $isCreditNote
             ? (isset($data['credit_note_id']) ? (string) $data['credit_note_id'] : null)
             : (isset($data['transaction_id']) ? (string) $data['transaction_id'] : null);
@@ -296,12 +308,33 @@ class KpraDriver extends AbstractDriver
             invoiceNumber: $invoiceNumber,
             dated: $data['date_time'] ?? $data['note_date'] ?? null,
             statusCode: isset($body['status']) ? (string) $body['status'] : (string) $httpStatus,
-            status: $body['message'] ?? ($valid ? 'Valid' : 'Invalid'),
+            status: $alreadyThere
+                ? 'Already reported (KPRA already had this invoice; no KPRA number returned)'
+                : ($body['message'] ?? ($valid ? 'Valid' : 'Invalid')),
             errors: $valid ? [] : $this->extractErrors($httpStatus, $body),
             raw: $body,
             httpStatus: $httpStatus,
             qrPayload: $qrPayload,
         );
+    }
+
+    /** Does KPRA's answer say this invoice_no is already on record? */
+    protected function saysAlreadyExists(array $body): bool
+    {
+        $texts = [(string) ($body['message'] ?? '')];
+        foreach ((array) ($body['errors'] ?? []) as $msgs) {
+            foreach ((array) $msgs as $msg) {
+                $texts[] = is_scalar($msg) ? (string) $msg : '';
+            }
+        }
+
+        foreach ($texts as $text) {
+            if (stripos($text, 'already exists') !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return string[] */

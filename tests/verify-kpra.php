@@ -142,7 +142,7 @@ $mixed = (new InvoiceBuilder())->type('Sale Invoice')->date('2025-12-26')
 [, $mixErrors] = $d5->buildPayload($mixed);
 check('mixed rates produce an error', (bool) preg_grep('/single tax rate/i', $mixErrors));
 
-echo "\n== 6. invoice_no is unique per pos_id (duplicate rejected) ==\n";
+echo "\n== 6. invoice_no is unique per pos_id (a resend of the same sale is already reported) ==\n";
 [$d6, $m6] = cloudDriver($kpraConfig);
 $mk = fn (string $no) => (new InvoiceBuilder())->type('Sale Invoice')->date('2025-12-26')
     ->seller('K123456', 'HEAD OFFICE', 'Khyber Pakhtunkhwa', 'Peshawar')->walkInCustomer()->number($no)->modeOfPay('Cash')
@@ -150,8 +150,27 @@ $mk = fn (string $no) => (new InvoiceBuilder())->type('Sale Invoice')->date('202
     ->build();
 check('first submit valid', $d6->submit($mk('DUP-1'))->isValid());
 $dupRes = $d6->submit($mk('DUP-1'));
-check('duplicate submit invalid', ! $dupRes->isValid());
-check('error mentions already exists', (bool) preg_grep('/already exists|duplicate/i', $dupRes->errors()));
+// KPRA keeps one invoice per invoice_no: "already exists" means it HAS this
+// sale (an earlier send got there), so it is reported, not failed (N37).
+check('resend of the same sale counts as reported', $dupRes->isValid());
+check('resend has no errors', $dupRes->errors() === []);
+check('resend is not retried', ! $dupRes->isRetryable());
+check('resend has no KPRA number (KPRA did not send one)', $dupRes->invoiceNumber() === null);
+check('resend status says already reported', stripos($dupRes->status(), 'already') !== false);
+
+// KPRA's real answer, as stored on prod (fiscal_invoices 3925, 4011, 4029).
+$real = $d6->parse(400, ['status' => 400, 'message' => 'Invoice already exists']);
+check('real KPRA "Invoice already exists" counts as reported', $real->isValid() && $real->invoiceNumber() === null);
+$inErrors = $d6->parse(400, ['status' => 400, 'message' => 'Validation failed', 'errors' => ['invoice_no' => ['The invoice no already exists.']]]);
+check('"already exists" inside errors counts too', $inErrors->isValid());
+
+// Anything else stays a failure.
+$other = $d6->parse(400, ['status' => 400, 'message' => 'Invalid date_time. Use YYYY-MM-DD HH:MM:SS.']);
+check('other 400 still failed', ! $other->isValid() && ! $other->isRetryable());
+$auth = $d6->parse(401, ['status' => 401, 'message' => 'Invalid POS ID or key. Invoice already exists?']);
+check('only a 400 is read as already reported', ! $auth->isValid());
+$server = $d6->parse(500, ['message' => 'Invoice already exists']);
+check('a 500 is still retried, not reported', ! $server->isValid() && $server->isRetryable());
 
 echo "\n== 7. payment_mode maps Card -> 2 ==\n";
 [$d7] = cloudDriver($kpraConfig);
