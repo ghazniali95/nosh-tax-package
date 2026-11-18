@@ -2,6 +2,11 @@
 
 All notable changes to `nosh/omnitax`. Versions follow [Semantic Versioning](https://semver.org).
 
+## v1.3.2 — 2026-11-19
+
+### Fixed
+- **KPRA "Invoice already exists" marked a reported sale as failed.** The real-time send stops waiting after 3 s; when KPRA saved the invoice but answered late, the retry got 400 "Invoice already exists" and the record was `failed`, though the sale was at KPRA. A sale answered 400 with "already exists" is now `valid` (reported) with no fiscal number or QR (KPRA does not repeat its transaction id). Other 400s, 401s and 5xx are unchanged. Credit notes unchanged.
+
 ## v1.3.1 — 2026-10-13
 
 ### Fixed
