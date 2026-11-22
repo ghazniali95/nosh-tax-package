@@ -2,6 +2,12 @@
 
 All notable changes to `nosh/omnitax`. Versions follow [Semantic Versioning](https://semver.org).
 
+## v1.4.0 — 2026-11-23
+
+### Added
+- **FBR POS (IMS)** — FBR's point-of-sale integration for Tier-1 retailers and restaurants, next to FBR Digital Invoicing. Authority `fbr` with credentials mode **`pos`** selects the new `FbrPosDriver` (config `authorities.fbr.mode_drivers`); no mode = Digital Invoicing as before. POS ID + Bearer token, PRAL's IMS JSON with `BuyerNTN`, live `https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData`, sandbox `https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData` (`FISCAL_FBR_POS_URL` / `FISCAL_FBR_POS_SB_URL`), success Code `100`, QR = the FBR invoice number, credit notes as InvoiceType 3 + RefUSIN. Env: `FISCAL_FBR_MODE=pos`, `FISCAL_FBR_POS_ID`. A 403 from FBR's gateway says to check the token and the server IP/MAC registered on the POS in IRIS.
+- `FiscalManager::transport($authority, $mode)` — the mock transport follows the integration (FBR POS uses the PRA/IMS mock).
+
 ## v1.3.1 — 2026-10-13
 
 ### Fixed

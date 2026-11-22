@@ -101,6 +101,21 @@ if ($response->isValid()) {
 
 As with FBR, set `FISCAL_TRANSPORT=mock` to build and test the whole SRB flow — both modes — with **no POS ID and no network**.
 
+### 2a. FBR POS (Tier-1 retailers & restaurants) — mode `pos`
+
+FBR runs **two** systems. `FbrDriver` is **Digital Invoicing** (sales-tax invoices, `gw.fbr.gov.pk/di_data`, one token, no POS ID). Shops and restaurants on FBR's **POS integration** get a **POS ID + token** per registered POS instead — set the credentials' `mode` to **`pos`** (or `FISCAL_FBR_MODE=pos`) and the same `fbr` authority uses `FbrPosDriver`:
+
+| | |
+|---|---|
+| Live | `POST https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData` |
+| Sandbox | `POST https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData` |
+| Auth | `Authorization: Bearer <token>` issued with the POS ID |
+| Payload | PRAL's IMS format (as PRA), buyer field `BuyerNTN` |
+| Success | `Code === "100"` + `InvoiceNumber`; QR = the invoice number (verified in FBR's Tax Asaan app) |
+| Returns | InvoiceType 3 + `RefUSIN` |
+
+**Registration (IRIS → POS registration):** a POS identification number (any fixed name), type **Primary**, and the sending server's **IP and MAC address**. FBR then generates the POS ID and token. A `403 Resource forbidden (900908)` means the token or the registered IP/MAC does not match the calling server.
+
 ### 2b. PRA (Punjab Revenue Authority) — cloud & offline
 
 PRA (via PRAL) fiscalises each sale through its **Software Fiscal Device / IMS** and returns a **PRA Invoice Number** plus a QR that encodes PRA's verification URL. Like SRB, PRA offers two integration modes, and the package supports **both from the same code** — same canonical invoice, only the deployment's mode differs:

@@ -287,7 +287,10 @@ class FiscalManager
             throw new FiscalException("Unknown fiscal authority [{$authKey}].");
         }
 
-        $driverClass = $authConfig['driver'] ?? null;
+        // An authority can have more than one integration, picked by the
+        // credentials' mode (FBR: Digital Invoicing by default, `pos` = FBR POS).
+        $driverClass = $authConfig['mode_drivers'][strtolower((string) ($credentials->mode ?? ''))]
+            ?? $authConfig['driver'] ?? null;
         if (! $driverClass) {
             throw new FiscalException(
                 "Authority [{$authKey}] ({$authConfig['label']}) is not yet available. "
@@ -295,7 +298,7 @@ class FiscalManager
             );
         }
 
-        return new $driverClass($credentials, $authConfig, $this->transport($authKey));
+        return new $driverClass($credentials, $authConfig, $this->transport($authKey, $credentials->mode));
     }
 
     public function credentials(): Credentials
@@ -331,8 +334,9 @@ class FiscalManager
         };
     }
 
-    public function transport(?string $authority = null): Transport
+    public function transport(?string $authority = null, ?string $mode = null): Transport
     {
+        $integration = $mode;
         $mode = $this->config['transport'] ?? 'http';
 
         if ($this->container->bound(Transport::class)) {
@@ -342,7 +346,14 @@ class FiscalManager
         if ($mode === 'mock') {
             // Each authority's mock returns responses in that authority's own
             // documented shape.
-            return match ($authority ?? $this->authority ?? $this->config['default'] ?? 'fbr') {
+            $authority ??= $this->authority ?? $this->config['default'] ?? 'fbr';
+
+            // FBR POS speaks PRAL's IMS format, which the PRA mock already fakes.
+            if ($authority === 'fbr' && strtolower((string) $integration) === 'pos') {
+                return new PraMockTransport();
+            }
+
+            return match ($authority) {
                 'srb'   => new SrbMockTransport(),
                 'pra'   => new PraMockTransport(),
                 'kpra'  => new KpraMockTransport(),

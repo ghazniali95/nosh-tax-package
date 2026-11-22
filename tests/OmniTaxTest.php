@@ -107,4 +107,60 @@ class OmniTaxTest extends TestCase
         $this->expectExceptionMessageMatches('/rolling out|not yet available/i');
         OmniTax::authority('bra')->submit($this->restaurantInvoice());
     }
+
+    /** FBR POS (mode `pos`): IMS payload with BuyerNTN, FBR's live URL, Bearer token, QR = the number. */
+    public function test_fbr_pos_files_through_the_ims_format(): void
+    {
+        $this->app->offsetUnset(\Nosh\OmniTax\Contracts\Transport::class);
+        $mock = new \Nosh\OmniTax\Transport\PraMockTransport();
+        $this->app->instance(\Nosh\OmniTax\Contracts\Transport::class, $mock);
+
+        OmniTax::resolveCredentialsUsing(fn () => new Credentials(
+            authority: 'fbr', sandbox: false, token: 'fbr-pos-token', posId: '100001', mode: 'pos',
+            seller: new Seller('1234567-8', 'Test Restaurant', 'Islamabad Capital Territory', 'Islamabad'),
+        ));
+
+        $driver = OmniTax::authority('fbr')->driver();
+        $this->assertInstanceOf(\Nosh\OmniTax\Drivers\FbrPosDriver::class, $driver);
+
+        $response = OmniTax::authority('fbr')->submit($this->restaurantInvoice());
+
+        $this->assertTrue($response->isValid(), json_encode($response->errors()));
+        $this->assertSame($response->invoiceNumber(), $response->qrPayload());
+
+        $sent = end($mock->recorded);
+        $this->assertSame('https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData', $sent['url']);
+        $this->assertSame(100001, $sent['payload']['POSID']);
+        $this->assertArrayHasKey('BuyerNTN', $sent['payload']);
+        $this->assertArrayNotHasKey('BuyerPNTN', $sent['payload']);
+    }
+
+    /** Without a token, or refused at FBR's gateway, the reason names FBR, not PRA. */
+    public function test_fbr_pos_refusals_name_fbr(): void
+    {
+        OmniTax::resolveCredentialsUsing(fn () => new Credentials(
+            authority: 'fbr', sandbox: false, token: null, posId: '100001', mode: 'pos',
+            seller: new Seller('1234567-8', 'Test Restaurant', 'Islamabad Capital Territory', 'Islamabad'),
+        ));
+
+        $response = OmniTax::authority('fbr')->submit($this->restaurantInvoice());
+        $this->assertFalse($response->isValid());
+        $this->assertStringContainsString('FBR POS requires the token', implode(' ', $response->errors()));
+
+        $forbidden = OmniTax::authority('fbr')->driver()->parse(403, ['fault' => ['code' => 900908]]);
+        $this->assertFalse($forbidden->isValid());
+        $this->assertStringContainsString('IP and MAC', implode(' ', $forbidden->errors()));
+    }
+
+    /** No mode = FBR Digital Invoicing, exactly as before. */
+    public function test_fbr_without_a_mode_is_still_digital_invoicing(): void
+    {
+        OmniTax::resolveCredentialsUsing(fn () => new Credentials(
+            authority: 'fbr', sandbox: true, token: 't',
+            seller: new Seller('1234567', 'Test Restaurant', 'Punjab', 'Lahore'),
+        ));
+
+        $this->assertInstanceOf(\Nosh\OmniTax\Drivers\FbrDriver::class, OmniTax::authority('fbr')->driver());
+        $this->assertNotInstanceOf(\Nosh\OmniTax\Drivers\FbrPosDriver::class, OmniTax::authority('fbr')->driver());
+    }
 }
