@@ -145,8 +145,18 @@ return [
         'fbr' => [
             'label'  => 'FBR (Federal / PRAL)',
             'driver' => \Nosh\OmniTax\Drivers\FbrDriver::class,
+            // mode `pos` (per tenant `mode` column, or FISCAL_FBR_MODE) = FBR POS
+            // (IMS) for Tier-1 retailers/restaurants: POS ID + token, IP + MAC
+            // registered in IRIS. Default (empty) = Digital Invoicing.
+            'mode_drivers' => [
+                'pos' => \Nosh\OmniTax\Drivers\FbrPosDriver::class,
+            ],
+            'mode'   => env('FISCAL_FBR_MODE'),
+            'pos_id' => env('FISCAL_FBR_POS_ID'),
             'token'  => env('FISCAL_TOKEN'),
             'urls'   => [
+                'pos'         => env('FISCAL_FBR_POS_URL', 'https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData'),
+                'pos_sb'      => env('FISCAL_FBR_POS_SB_URL', 'https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData'),
                 'submit'      => 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata',
                 'submit_sb'   => 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb',
                 'validate'    => 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata',
