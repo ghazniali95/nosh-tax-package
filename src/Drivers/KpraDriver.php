@@ -93,7 +93,34 @@ class KpraDriver extends AbstractDriver
             );
         }
 
-        return $this->send($this->endpoint($invoice), $payload);
+        $response = $this->send($this->endpoint($invoice), $payload);
+
+        // The QR must be KPRA's verification link for OUR invoice_no and the
+        // POS ID (RIMS docs; kpra.gov.pk/api/?pos_id=…&invoice_no=…). The live
+        // reply does not always echo them back, and without them the QR fell
+        // back to the transaction id, which KPRA's verify page does not find.
+        // We sent both, so build it from the request when the reply lacks it.
+        $isSale = ! array_key_exists('credit_note_id', $response->raw()['data'] ?? [])
+            && ! empty($payload['invoice_no']) && ! empty($payload['pos_id'])
+            && ! isset($payload['credit_note_no']);
+        if ($response->isValid() && $isSale && ! $this->hasVerifyUrl($response)) {
+            $response = $response->withQrPayload($this->verifyUrl((string) $payload['pos_id'], (string) $payload['invoice_no']));
+        }
+
+        return $response;
+    }
+
+    /** KPRA's invoice verification link for a sale. */
+    public function verifyUrl(string $posId, string $invoiceNo): string
+    {
+        $base = rtrim((string) ($this->config['urls']['verify'] ?? 'https://kpra.gov.pk/api/'), '/').'/';
+
+        return $base.'?pos_id='.rawurlencode($posId).'&invoice_no='.rawurlencode($invoiceNo);
+    }
+
+    private function hasVerifyUrl(FiscalResponse $response): bool
+    {
+        return str_contains((string) $response->qrPayload(), 'invoice_no=');
     }
 
     /** KPRA publishes no server-to-server reference lists. */
@@ -286,9 +313,7 @@ class KpraDriver extends AbstractDriver
         // Verification URL for the receipt QR (sales invoices only).
         $qrPayload = null;
         if (! $isCreditNote && $valid && ! empty($data['pos_id']) && ! empty($data['invoice_no'])) {
-            $base = rtrim((string) ($this->config['urls']['verify'] ?? 'https://kpra.gov.pk/api/'), '/').'/';
-            $qrPayload = $base.'?pos_id='.rawurlencode((string) $data['pos_id'])
-                .'&invoice_no='.rawurlencode((string) $data['invoice_no']);
+            $qrPayload = $this->verifyUrl((string) $data['pos_id'], (string) $data['invoice_no']);
         }
 
         return new FiscalResponse(
