@@ -83,6 +83,15 @@ class FiscalResponse
         return ! $this->valid && ($this->httpStatus === 0 || $this->httpStatus >= 500);
     }
 
+    /** The same response with a different QR payload (a driver filling it in). */
+    public function withQrPayload(?string $qrPayload): static
+    {
+        $copy = clone $this;
+        $copy->qrPayload = $qrPayload;
+
+        return $copy;
+    }
+
     /** The exact string a driver wants encoded in the QR, when it differs from the
      *  fiscal number (SRB encodes the verification URL; FBR encodes the number). */
     public function qrPayload(): ?string

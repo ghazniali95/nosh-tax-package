@@ -232,6 +232,21 @@ $badInvoice = (new InvoiceBuilder())->type('Sale Invoice')->date('2025-12-26')
     ->build();
 check('missing-rate invoice fails validation', ! $d10->validate($badInvoice)->isValid());
 
+echo "\n== 11. Live KPRA reply without pos_id/invoice_no -> QR is still the verify link (#841) ==\n";
+$bare = new class implements \Nosh\OmniTax\Contracts\Transport {
+    public function post(string $url, array $payload, array $headers = []): array
+    { return ['status' => 201, 'body' => ['status' => 201, 'message' => 'Invoice created successfully', 'data' => ['transaction_id' => 12633597]]]; }
+    public function get(string $url, array $query = [], array $headers = []): array { return ['status' => 200, 'body' => []]; }
+};
+$d11 = new KpraDriver(new Credentials(authority: 'kpra', sandbox: false,
+    seller: new Seller('K123456', 'HEAD OFFICE', 'Khyber Pakhtunkhwa', 'Peshawar'),
+    posId: 'K123456', mode: 'cloud', apiKey: 'KPRA@123a'), $kpraConfig, $bare);
+$r11 = $d11->submit($invoice);
+[$p11] = $d11->buildPayload($invoice);
+check('accepted', $r11->isValid());
+check('number is still the transaction id', $r11->invoiceNumber() === '12633597');
+check('QR = verify link with our POS ID + invoice_no', $r11->qrPayload() === 'https://kpra.gov.pk/api/?pos_id=K123456&invoice_no='.rawurlencode((string) $p11['invoice_no']));
+
 echo "\n".str_repeat('-', 40)."\n";
 echo "PASSED: {$pass}   FAILED: {$fail}\n";
 exit($fail === 0 ? 0 : 1);
